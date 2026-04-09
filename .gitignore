@@ -1,0 +1,16 @@
+# macOS
+.DS_Store
+
+# Go
+bin/
+dist/
+*.exe
+*.out
+vendor/
+
+# Benchmarks output
+benchmarks/results/
+
+# IDE
+.vscode/
+.idea/

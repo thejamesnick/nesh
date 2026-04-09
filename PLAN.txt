@@ -1,0 +1,132 @@
+# Nesh Implementation Plan
+
+## Phase 1: Foundation (Weeks 1-2)
+**Goal**: Working lexer, parser, basic commands, and CLI
+
+### Build:
+- [ ] Lexer: Tokenize keywords, identifiers, strings, numbers, operators
+- [ ] Parser: Build AST from tokens (recursive descent or Pratt parser)
+- [ ] Runtime: Basic executor for print, let, simple expressions
+- [ ] CLI: Basic nesh command that runs .nsh files
+- [ ] Standard Library: print, let
+
+### Test:
+- [ ] Unit tests for lexer (tokenization accuracy)
+- [ ] Unit tests for parser (AST generation)
+- [ ] Integration tests: print "hello", let x = 5, print x
+- [ ] Manual testing: REPL basic functionality
+- [ ] Benchmark: Startup time for simple scripts
+
+**Done when**: `nesh script.nsh` works for print/let basics
+
+---
+
+## Phase 2: Core Features (Weeks 3-4)
+**Goal**: Control flow, functions, expanded stdlib
+
+### Build:
+- [ ] Control Flow: if/then/else/end, comparison operators
+- [ ] Functions: fn name() ... end, return statements, parameters
+- [ ] Standard Library: if, fn, basic string ops
+- [ ] System Commands: any unknown command resolved from PATH (no `run` wrapper needed)
+- [ ] CLI Enhancements: better error handling, help text
+
+### Test:
+- [ ] Unit tests for control flow execution
+- [ ] Unit tests for function calls and scoping
+- [ ] Integration tests: if statements, function definitions/calls
+- [ ] Manual testing: complex scripts with nesting
+- [ ] Benchmark: Loop performance, variable access speed
+
+**Done when**: `nesh script.nsh` works with if/else and functions
+
+---
+
+## Phase 3: AI Integration & Polish (Weeks 5-6)
+**Goal**: Structured APIs, error handling, REPL improvements
+
+### Build:
+- [ ] Error Handling: Better error messages, position tracking
+- [ ] REPL: History, line editing, multi-line support
+- [ ] Structured Output: JSON AST export option for AI consumption
+- [ ] Standard Library: File operations, math functions, string manipulation
+- [ ] Module System: Basic import/export (simple version)
+
+### Test:
+- [ ] Unit tests for error cases and reporting
+- [ ] Integration tests: file I/O, math operations
+- [ ] REPL testing: history, editing, tab completion (basic)
+- [ ] API testing: Structured output validity
+- [ ] Benchmark: Memory usage during execution, GC impact
+
+**Done when**: REPL is usable and error messages are helpful
+
+---
+
+## Phase 4: Ecosystem & Distribution (Weeks 7-8)
+**Goal**: Packaging, cross-platform, optimization
+
+### Build:
+- [ ] Package Manager: Simple nesh pkg install/run
+- [ ] Cross-Platform: Test/build for macOS, Linux, Windows
+- [ ] Performance: Profile and optimize hot paths
+- [ ] Documentation: Complete user guide, examples
+- [ ] Optional: Rust/C interop hooks for performance-critical paths
+
+### Test:
+- [ ] Cross-platform builds and basic functionality
+- [ ] Package installation and usage
+- [ ] Performance benchmarks vs Bash targets
+- [ ] Documentation examples all work
+- [ ] Manual testing: Real-world automation scripts
+
+**Done when**: Nesh can be installed and used for practical automation
+
+---
+
+## Each Phase Checklist:
+- [ ] Feature implementation complete
+- [ ] Unit tests written and passing
+- [ ] Integration tests written and passing
+- [ ] Manual testing completed
+- [ ] Benchmark measurements taken
+- [ ] Documentation updated
+- [ ] Code reviewed
+- [ ] PLAN.txt updated for next phase
+
+---
+
+## Success Criteria
+
+### Phase 1:
+- [ ] `print "hello"` works
+- [ ] `let x = 42` then `print x` works
+- [ ] Basic REPL functional
+- [ ] Lexer/parser unit tests >90% pass
+
+### Phase 2:
+- [ ] if/else statements work correctly
+- [ ] Function definition and invocation works
+- [ ] Recursive functions work (simple cases)
+- [ ] System commands run directly without wrapper
+- [ ] Control flow unit tests >85% pass
+
+### Phase 3:
+- [ ] REPL usable for daily tasks
+- [ ] Error messages include line/column info
+- [ ] Structured JSON output valid
+- [ ] File operations work (read/write)
+
+### Phase 4:
+- [ ] Cross-platform builds successful
+- [ ] Package manager installs/runs simple packages
+- [ ] Performance meets benchmark goals (>=70% wins vs Bash)
+- [ ] Real-world automation scripts work
+
+---
+
+## Immediate Next Actions:
+- [ ] Create go.mod: `go mod init nesh`
+- [ ] Create directory structure
+- [ ] Write first lexer test
+- [ ] Implement lexer for basic tokens
