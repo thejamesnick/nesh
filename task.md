@@ -80,7 +80,7 @@ a task isn't "done" until its test box is checked, and every phase ends with PLA
 
 - [ ] T3.1 Error system: parse + runtime errors with line/col, "expected X, got Y" messages
 - [x] T3.2 REPL: history, line editing (raw mode), multi-line blocks via parser.OpenBlocks
-- [ ] T3.3 `nesh --json script.nsh`: emits JSON AST + structured execution events (the agent-API beachhead)
+- [x] T3.3 `nesh --json script.nsh`: JSON AST (kind-tagged nodes) + structured execution events {status, ast, events, errors}
 - [ ] T3.4 Stdlib: string ops (len, upper, lower, split, join, contains), math (abs, floor, round, min, max), file ops (read, write, exists)
 - [ ] T3.5 Modules: `import "utils.nsh"` — simple, file-based
 - [ ] T3.6 Memory/GC benchmark pass, docs, tag `v0.3.0`
