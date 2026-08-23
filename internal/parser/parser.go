@@ -102,6 +102,8 @@ func (p *parser) parseStmt() (ast.Stmt, bool) {
 		return p.parseIf()
 	case token.FN:
 		return p.parseFn()
+	case token.WHILE:
+		return p.parseWhile()
 	case token.RETURN:
 		return p.parseReturn()
 	case token.IDENT:
@@ -159,6 +161,23 @@ func (p *parser) parseFn() (ast.Stmt, bool) {
 		return nil, false
 	}
 	return &ast.FnStmt{Pos: pos, Name: name, Params: params, Body: body}, true
+}
+
+func (p *parser) parseWhile() (ast.Stmt, bool) {
+	pos := ast.Pos{Line: p.cur.Line, Column: p.cur.Column}
+	p.next() // consume 'while'
+	cond, ok := p.parseExpr(precLowest)
+	if !ok {
+		return nil, false
+	}
+	body, ok := p.parseBlock(token.END)
+	if !ok {
+		return nil, false
+	}
+	if !p.expect(token.END) {
+		return nil, false
+	}
+	return &ast.WhileStmt{Pos: pos, Cond: cond, Body: body}, true
 }
 
 func (p *parser) parseReturn() (ast.Stmt, bool) {

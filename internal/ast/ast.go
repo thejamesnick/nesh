@@ -75,6 +75,13 @@ type ExprStmt struct {
 	Expr Expr
 }
 
+// WhileStmt is `while cond ... end`.
+type WhileStmt struct {
+	Pos  Pos
+	Cond Expr
+	Body []Stmt
+}
+
 // Ident is a variable reference.
 type Ident struct {
 	Pos  Pos
@@ -139,6 +146,7 @@ func (s *IfStmt) Position() Pos     { return s.Pos }
 func (s *FnStmt) Position() Pos     { return s.Pos }
 func (s *ReturnStmt) Position() Pos { return s.Pos }
 func (s *ExprStmt) Position() Pos   { return s.Expr.Position() }
+func (s *WhileStmt) Position() Pos  { return s.Pos }
 func (e *Ident) Position() Pos      { return e.Pos }
 func (e *IntLit) Position() Pos     { return e.Pos }
 func (e *FloatLit) Position() Pos   { return e.Pos }
@@ -154,6 +162,7 @@ func (*IfStmt) stmtNode()     {}
 func (*FnStmt) stmtNode()     {}
 func (*ReturnStmt) stmtNode() {}
 func (*ExprStmt) stmtNode()   {}
+func (*WhileStmt) stmtNode()  {}
 
 func (*Ident) exprNode()      {}
 func (*IntLit) exprNode()     {}

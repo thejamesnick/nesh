@@ -321,6 +321,27 @@ func TestBareCallStatement(t *testing.T) {
 	}
 }
 
+func TestWhileLoop(t *testing.T) {
+	cases := []struct{ src, want string }{
+		// countdown
+		{"let i = 3\nwhile i > 0\nprint i\nlet i = i - 1\nend\n", "3\n2\n1\n"},
+		// condition false from the start: body never runs
+		{"while false\nprint \"never\"\nend\nprint \"done\"\n", "done\n"},
+		// loop with function calls and return inside body
+		{"fn bump(n)\nreturn n + 1\nend\nlet i = 0\nwhile i < 5\nlet i = bump(i)\nend\nprint i\n", "5\n"},
+	}
+	for _, c := range cases {
+		out, err := run(t, c.src)
+		if err != nil {
+			t.Errorf("%q: unexpected error %v", c.src, err)
+			continue
+		}
+		if out != c.want {
+			t.Errorf("%q: got %q, want %q", c.src, out, c.want)
+		}
+	}
+}
+
 func TestWhitespaceTolerance(t *testing.T) {
 	// Indentation is optional style; blocks are closed by keywords.
 	// Tabs, multiple spaces, missing spaces before strings, blank lines,

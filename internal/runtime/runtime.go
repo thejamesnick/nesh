@@ -160,6 +160,19 @@ func (r *Runtime) execStmt(stmt ast.Stmt) (*returnValue, *Error) {
 			return r.execBlock(s.Then)
 		}
 		return r.execBlock(s.Else)
+	case *ast.WhileStmt:
+		for {
+			cond, err := r.eval(s.Cond)
+			if err != nil {
+				return nil, err
+			}
+			if !Truthy(cond) {
+				return nil, nil
+			}
+			if ret, err := r.execBlock(s.Body); ret != nil || err != nil {
+				return ret, err
+			}
+		}
 	case *ast.FnStmt:
 		r.scopes[0][s.Name] = &Func{Name: s.Name, Params: s.Params, Body: s.Body}
 		return nil, nil

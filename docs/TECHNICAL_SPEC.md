@@ -130,6 +130,19 @@ Decision: Nesh has `elif` (not `else if`). Flat chains beat deep nesting —
 for humans reading them and for agents generating them. Indentation inside
 blocks is optional style, not syntax; blocks are closed by keywords.
 
+Loops:
+
+```
+while i < 10
+  print i
+  let i = i + 1
+end
+```
+
+There is no `break`/`continue` yet (Phase 3 candidate if needed). An
+infinite loop is the author's responsibility, same as bash — no guard.
+`for x in list` arrives with list values.
+
 ## 4.6 Functions
 
 ```
