@@ -1,0 +1,110 @@
+// Package ast defines the Nesh abstract syntax tree.
+//
+// Contract (MODULES.md): dumb data carrying position info. No behavior
+// beyond what debugging needs. Imports token only.
+package ast
+
+// Pos is a source position (1-based line and column).
+type Pos struct {
+	Line   int
+	Column int
+}
+
+// Node is anything in the tree that knows where it came from.
+type Node interface {
+	Position() Pos
+}
+
+// Script is a parsed .nsh file: a sequence of statements.
+type Script struct {
+	Stmts []Stmt
+}
+
+// Stmt is a single statement.
+type Stmt interface {
+	Node
+	stmtNode()
+}
+
+// Expr is a typed expression tree.
+type Expr interface {
+	Node
+	exprNode()
+}
+
+// LetStmt is `let name = value`.
+type LetStmt struct {
+	Pos   Pos
+	Name  string
+	Value Expr
+}
+
+// PrintStmt is `print arg1 arg2 ...` (zero or more space-separated args).
+type PrintStmt struct {
+	Pos  Pos
+	Args []Expr
+}
+
+// Ident is a variable reference.
+type Ident struct {
+	Pos  Pos
+	Name string
+}
+
+// IntLit is an integer literal.
+type IntLit struct {
+	Pos   Pos
+	Value int64
+}
+
+// FloatLit is a floating-point literal.
+type FloatLit struct {
+	Pos   Pos
+	Value float64
+}
+
+// StringLit is a string literal (already unescaped by the lexer).
+type StringLit struct {
+	Pos   Pos
+	Value string
+}
+
+// PrefixExpr is a unary operation (currently: negation).
+type PrefixExpr struct {
+	Pos   Pos
+	Op    string // "-"
+	Right Expr
+}
+
+// InfixExpr is a binary operation: + - * /
+type InfixExpr struct {
+	Pos  Pos
+	Op   string
+	L, R Expr
+}
+
+func (s *Script) Position() Pos {
+	if len(s.Stmts) == 0 {
+		return Pos{}
+	}
+	return s.Stmts[0].Position()
+}
+
+func (s *LetStmt) Position() Pos    { return s.Pos }
+func (s *PrintStmt) Position() Pos  { return s.Pos }
+func (e *Ident) Position() Pos      { return e.Pos }
+func (e *IntLit) Position() Pos     { return e.Pos }
+func (e *FloatLit) Position() Pos   { return e.Pos }
+func (e *StringLit) Position() Pos  { return e.Pos }
+func (e *PrefixExpr) Position() Pos { return e.Pos }
+func (e *InfixExpr) Position() Pos  { return e.Pos }
+
+func (*LetStmt) stmtNode()   {}
+func (*PrintStmt) stmtNode() {}
+
+func (*Ident) exprNode()      {}
+func (*IntLit) exprNode()     {}
+func (*FloatLit) exprNode()   {}
+func (*StringLit) exprNode()  {}
+func (*PrefixExpr) exprNode() {}
+func (*InfixExpr) exprNode()  {}
