@@ -61,7 +61,7 @@ a task isn't "done" until its test box is checked, and every phase ends with PLA
 
 **DW: scripts with if/else, fn definitions/calls (incl. simple recursion), and PATH commands run correctly.**
 
-- [~] T2.1 Comparison + boolean operators (`== != < > <= >= and or not`), truthiness rules written into spec
+- [x] T2.1 Comparison + boolean operators (`== != < > <= >= and or not`), `true`/`false` literals; truthiness rules in TECHNICAL_SPEC.md 4.4
 - [ ] T2.2 `if cond then ... else ... end` execution (+ `elif`? decide and document)
 - [ ] T2.3 `fn name(params) ... end` with `return`; lexical scoping decision (dynamic vs lexical — document!)
 - [ ] T2.4 Function calls as expressions; recursion works
