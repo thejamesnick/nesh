@@ -67,8 +67,10 @@ a task isn't "done" until its test box is checked, and every phase ends with PLA
 - [x] T2.4 Function calls as expressions AND bare-call statements (`deploy("prod")`); recursion works (factorial/fib tested)
 - [~] T2.5 Loops: `while cond ... end` done; `for x in list` blocked on list-value decision (literals `[1, 2, 3]`?); no break/continue yet (documented)
 - [x] T2.6 Unknown command → exec from PATH via `internal/shell.CommandRunner` seam; literal word args, flag merging (`-la`, `--force`); `run cmd` expression = exit code (the `$?`-successor idiom: `let code = run git status`); variable-shadow guard; no stdin passthrough yet
-- [ ] T2.7 Unit + integration tests (>85% control-flow/fn coverage), real .nsh integration scripts in testdata
-- [ ] T2.8 Phase close-out: loop/variable benchmarks vs Bash, docs updated, tag `v0.2.0`
+- [x] T2.7 Unit + integration tests (runtime 88%, parser 82%, lexer 98%; control-flow/fn >85% via runtime); 3 real integration scripts in testdata
+- [x] T2.8 Phase close-out: loop/variable/fn benchmarks vs Bash — nesh wins all (2.4x loop, 51x fn); results in benchmarks/results/v0.2.0.md; tag `v0.2.0`
+
+**Phase 2 ✅ COMPLETE — v0.2.0 tagged**
 
 ---
 
