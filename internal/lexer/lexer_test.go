@@ -105,8 +105,8 @@ func TestStrings(t *testing.T) {
 		[]tok{{token.STRING, `quote:" back:\\`}, {token.EOF, ""}})
 	// Unknown escapes pass through unchanged.
 	assertTokens(t, `"a\qb"`, []tok{{token.STRING, `a\qb`}, {token.EOF, ""}})
-	// Unterminated: still a STRING of what was scanned; parser reports position.
-	assertTokens(t, `"oops`, []tok{{token.STRING, "oops"}, {token.EOF, ""}})
+	// Unterminated strings get UNTERM; the parser turns it into an error.
+	assertTokens(t, `"oops`, []tok{{token.UNTERM, "oops"}, {token.EOF, ""}})
 }
 
 func TestNewlinesAreSignificant(t *testing.T) {

@@ -26,6 +26,9 @@ const (
 	LTE      Type = "<="
 	GTE      Type = ">="
 
+	// UNTERM marks a string literal that never closed before EOF.
+	UNTERM Type = "UNTERM"
+
 	// Delimiters
 	LPAREN  Type = "("
 	RPAREN  Type = ")"

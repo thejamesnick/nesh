@@ -112,7 +112,7 @@ func (l *Lexer) readString() (token.Type, string) {
 	for {
 		ch := l.peek()
 		if ch == 0 {
-			return token.STRING, b.String() // unterminated; parser reports position
+			return token.UNTERM, b.String() // parser reports position
 		}
 		if ch == '"' {
 			l.readChar()

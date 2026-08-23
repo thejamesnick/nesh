@@ -507,6 +507,9 @@ func (p *parser) parsePrimary() (ast.Expr, bool) {
 		v := p.cur.Literal
 		p.next()
 		return &ast.StringLit{Pos: pos, Value: v}, true
+	case token.UNTERM:
+		p.fail("unterminated string — missing closing quote")
+		return nil, false
 	case token.TRUE, token.FALSE:
 		v := p.cur.Type == token.TRUE
 		p.next()
