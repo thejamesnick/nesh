@@ -321,6 +321,17 @@ func TestBareCallStatement(t *testing.T) {
 	}
 }
 
+func TestWhitespaceTolerance(t *testing.T) {
+	// Indentation is optional style; blocks are closed by keywords.
+	// Tabs, multiple spaces, missing spaces before strings, blank lines,
+	// and one-line branches must all parse identically.
+	src := "let x=1\n\n\tif    x>0   then\n\t\tprint\"spaced out\"\n   elif x<0 then print \"neg\"\n else print \"zero\"\n end\n"
+	out, err := run(t, src)
+	if err != nil || out != "spaced out\n" {
+		t.Fatalf("whitespace handling broken: got %q, %v", out, err)
+	}
+}
+
 func TestComparisonErrors(t *testing.T) {
 	cases := []struct{ src, want string }{
 		{"print 1 < \"a\"\n", `1:9: cannot compare 1 and a with "<"`},
