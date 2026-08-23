@@ -114,8 +114,14 @@ func (p *parser) parseStmt() (ast.Stmt, bool) {
 			}
 			return &ast.ExprStmt{Pos: call.Position(), Expr: call}, true
 		}
-		p.fail("expected statement (let, print, if, or fn), got %q", p.cur.Literal)
-		return nil, false
+		return p.parseCmdPhrase(p.cur.Literal)
+	case token.RUN:
+		pos := ast.Pos{Line: p.cur.Line, Column: p.cur.Column}
+		runExpr, ok := p.parseRunExpr()
+		if !ok {
+			return nil, false
+		}
+		return &ast.ExprStmt{Pos: pos, Expr: runExpr}, true
 	default:
 		p.fail("expected statement (let, print, if, or fn), got %q", p.cur.Literal)
 		return nil, false
@@ -161,6 +167,69 @@ func (p *parser) parseFn() (ast.Stmt, bool) {
 		return nil, false
 	}
 	return &ast.FnStmt{Pos: pos, Name: name, Params: params, Body: body}, true
+}
+
+// parseCmdPhrase parses a bare command: `git commit -m "msg"`.
+// cur is the command-name token. Words are literals; leading dashes merge
+// into flags (`-m`, `--force`) because the lexer splits them.
+func (p *parser) parseCmdPhrase(name string) (ast.Stmt, bool) {
+	pos := ast.Pos{Line: p.cur.Line, Column: p.cur.Column}
+	p.next() // consume the name
+	stmt := &ast.CmdStmt{Pos: pos, Name: name}
+	for !p.atStatementBoundary() {
+		word, ok := p.parseCmdWord()
+		if !ok {
+			return nil, false
+		}
+		stmt.Args = append(stmt.Args, word)
+	}
+	return stmt, true
+}
+
+// parseRunExpr parses `run <command>` in expression position.
+func (p *parser) parseRunExpr() (ast.Expr, bool) {
+	pos := ast.Pos{Line: p.cur.Line, Column: p.cur.Column}
+	p.next() // consume 'run'
+	if p.atStatementBoundary() || p.cur.Type != token.IDENT {
+		p.fail("expected command name after run, got %q", p.cur.Literal)
+		return nil, false
+	}
+	name := p.cur.Literal
+	p.next()
+	expr := &ast.RunExpr{Pos: pos, Name: name}
+	for !p.atStatementBoundary() {
+		word, ok := p.parseCmdWord()
+		if !ok {
+			return nil, false
+		}
+		expr.Args = append(expr.Args, word)
+	}
+	return expr, true
+}
+
+func (p *parser) atStatementBoundary() bool {
+	switch p.cur.Type {
+	case token.NEWLINE, token.EOF, token.END, token.ELSE, token.ELIF:
+		return true
+	}
+	return false
+}
+
+func (p *parser) parseCmdWord() (string, bool) {
+	dashes := ""
+	for p.at(token.MINUS) {
+		dashes += "-"
+		p.next()
+	}
+	switch p.cur.Type {
+	case token.IDENT, token.INT, token.FLOAT, token.STRING:
+		word := dashes + p.cur.Literal
+		p.next()
+		return word, true
+	default:
+		p.fail("commands take simple words only (strings, numbers, flags), got %q — for expressions use print/if/let", p.cur.Literal)
+		return "", false
+	}
 }
 
 func (p *parser) parseWhile() (ast.Stmt, bool) {
@@ -442,6 +511,8 @@ func (p *parser) parsePrimary() (ast.Expr, bool) {
 		v := p.cur.Type == token.TRUE
 		p.next()
 		return &ast.BoolLit{Pos: pos, Value: v}, true
+	case token.RUN:
+		return p.parseRunExpr()
 	case token.LPAREN:
 		p.next()
 		inner, ok := p.parseExpr(precLowest)

@@ -1,6 +1,8 @@
 package runtime
 
 import (
+	"fmt"
+	"io"
 	"strings"
 	"testing"
 
@@ -310,14 +312,98 @@ func TestFunctionErrors(t *testing.T) {
 	}
 }
 
+// fakeRunner records commands instead of touching the OS.
+type fakeRunner struct {
+	calls []struct {
+		name string
+		args []string
+	}
+	code int
+}
+
+func (f *fakeRunner) Run(name string, args []string, stdout, stderr io.Writer) int {
+	f.calls = append(f.calls, struct {
+		name string
+		args []string
+	}{name, args})
+	fmt.Fprintln(stdout, "ran:", name)
+	return f.code
+}
+
+func TestSystemCommands(t *testing.T) {
+	out := &fakeOutput{}
+	fr := &fakeRunner{code: 0}
+	rt := New(out)
+	rt.SetRunner(fr)
+
+	runScript := func(src string) *Error {
+		script, perr := parser.Parse(src)
+		if perr != nil {
+			t.Fatalf("parse error for %q: %v", src, perr)
+		}
+		return rt.Run(script)
+	}
+
+	if err := runScript("git status --short\n"); err != nil || out.b.String() != "ran: git\n" {
+		t.Fatalf("command failed: %q, %v", out.b.String(), err)
+	}
+	if fr.calls[0].name != "git" || len(fr.calls[0].args) != 2 || fr.calls[0].args[0] != "status" || fr.calls[0].args[1] != "--short" {
+		t.Fatalf("bad call record: %+v", fr.calls[0])
+	}
+
+	// run expression captures the exit code
+	out.b.Reset()
+	if err := runScript("let code = run deploy staging --dry-run\nprint code == 0\n"); err != nil {
+		t.Fatal(err)
+	}
+	if got := out.b.String(); got != "ran: deploy\ntrue\n" {
+		t.Fatalf("run expression: got %q", got)
+	}
+	last := fr.calls[len(fr.calls)-1]
+	if last.name != "deploy" || last.args[0] != "staging" || last.args[1] != "--dry-run" {
+		t.Fatalf("run args wrong: %+v", last)
+	}
+
+	// nonzero exit code flows through
+	fr.code = 3
+	out.b.Reset()
+	if err := runScript("print run failing-cmd\n"); err != nil || out.b.String() != "ran: failing-cmd\n3\n" {
+		t.Fatalf("exit code capture: %q, %v", out.b.String(), err)
+	}
+
+	// variable shadowing guard
+	if err := runScript("let x = 5\nx foo\n"); err == nil ||
+		err.Error() != `2:1: x is a variable, not a command — did you mean print x?` {
+		t.Fatalf("shadow guard: %v", err)
+	}
+
+	// commands work inside functions and loops
+	fr.code = 0
+	out.b.Reset()
+	if err := runScript("fn ping(host)\nrun ping host\nreturn true\nend\nlet i = 0\nwhile i < 2\nping \"a\"\nlet i = i + 1\nend\n"); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(fr.calls); n < 4 {
+		t.Fatalf("expected loop+fn to invoke runner repeatedly, got %d calls", n)
+	}
+}
+
+func TestNoRunnerError(t *testing.T) {
+	_, err := run(t, "git status\n")
+	if err == nil || err.Error() != "1:1: system commands are not available here" {
+		t.Fatalf("got %v", err)
+	}
+}
+
 func TestBareCallStatement(t *testing.T) {
 	out, err := run(t, "fn deploy(env)\nprint \"deploying to\" env\nend\ndeploy(\"prod\")\n")
 	if err != nil || out != "deploying to prod\n" {
 		t.Fatalf("bare call statement failed: %q, %v", out, err)
 	}
-	// non-call bare identifiers stay a syntax error
-	if _, perr := parser.Parse("x\n"); perr == nil {
-		t.Fatal("bare ident should not parse as a statement")
+	// bare idents now parse as system commands — without a runner they
+	// fail at runtime with a clear error instead of a parse error
+	if _, rerr := run(t, "x\n"); rerr == nil {
+		t.Fatal("bare ident command should fail without a runner")
 	}
 }
 

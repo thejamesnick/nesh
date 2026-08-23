@@ -82,6 +82,22 @@ type WhileStmt struct {
 	Body []Stmt
 }
 
+// CmdStmt is a bare system command: `git status --short`. Words are literal
+// (no variable expansion yet — Phase 3 decision).
+type CmdStmt struct {
+	Pos  Pos
+	Name string
+	Args []string
+}
+
+// RunExpr is `run <command>` in expression position; it evaluates to the
+// command's exit code as an Int.
+type RunExpr struct {
+	Pos  Pos
+	Name string
+	Args []string
+}
+
 // Ident is a variable reference.
 type Ident struct {
 	Pos  Pos
@@ -147,6 +163,8 @@ func (s *FnStmt) Position() Pos     { return s.Pos }
 func (s *ReturnStmt) Position() Pos { return s.Pos }
 func (s *ExprStmt) Position() Pos   { return s.Expr.Position() }
 func (s *WhileStmt) Position() Pos  { return s.Pos }
+func (s *CmdStmt) Position() Pos    { return s.Pos }
+func (e *RunExpr) Position() Pos    { return e.Pos }
 func (e *Ident) Position() Pos      { return e.Pos }
 func (e *IntLit) Position() Pos     { return e.Pos }
 func (e *FloatLit) Position() Pos   { return e.Pos }
@@ -163,6 +181,7 @@ func (*FnStmt) stmtNode()     {}
 func (*ReturnStmt) stmtNode() {}
 func (*ExprStmt) stmtNode()   {}
 func (*WhileStmt) stmtNode()  {}
+func (*CmdStmt) stmtNode()    {}
 
 func (*Ident) exprNode()      {}
 func (*IntLit) exprNode()     {}
@@ -172,3 +191,4 @@ func (*BoolLit) exprNode()    {}
 func (*PrefixExpr) exprNode() {}
 func (*InfixExpr) exprNode()  {}
 func (*CallExpr) exprNode()   {}
+func (*RunExpr) exprNode()    {}

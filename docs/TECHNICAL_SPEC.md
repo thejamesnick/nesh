@@ -77,6 +77,25 @@ git status
 docker ps
 ```
 
+### System commands (implemented, Phase 2)
+
+- A bare `word ...` line runs the named program from PATH with literal
+  word arguments. Flags merge naturally: `-la`, `--force`.
+- Words are literals — strings, numbers, flags. No variable expansion yet
+  (Phase 3 decision); expressions don't belong in command position.
+- Exit codes: `run <command>` is an expression evaluating to the exit code:
+
+  ```nesh
+  let code = run git status
+  if code == 0 then
+    print "clean tree"
+  end
+  ```
+
+- A bare command's output streams straight through to stdout/stderr.
+- If a variable shadows a command name, calling it as a command is an
+  error with a hint ("did you mean print x?").
+
 ## 4.3 Variables
 
 ```

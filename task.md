@@ -66,7 +66,7 @@ a task isn't "done" until its test box is checked, and every phase ends with PLA
 - [x] T2.3 `fn name(params) ... end` with `return`; scoping decided: params/let are call-locals, reads fall back to globals, fns global, implicit return = false (spec 4.6)
 - [x] T2.4 Function calls as expressions AND bare-call statements (`deploy("prod")`); recursion works (factorial/fib tested)
 - [~] T2.5 Loops: `while cond ... end` done; `for x in list` blocked on list-value decision (literals `[1, 2, 3]`?); no break/continue yet (documented)
-- [ ] T2.6 Unknown command → exec from PATH, args, exit-code capture into `$?`-successor (design the idiom, e.g. `code = run git status`)
+- [x] T2.6 Unknown command → exec from PATH via `internal/shell.CommandRunner` seam; literal word args, flag merging (`-la`, `--force`); `run cmd` expression = exit code (the `$?`-successor idiom: `let code = run git status`); variable-shadow guard; no stdin passthrough yet
 - [ ] T2.7 Unit + integration tests (>85% control-flow/fn coverage), real .nsh integration scripts in testdata
 - [ ] T2.8 Phase close-out: loop/variable benchmarks vs Bash, docs updated, tag `v0.2.0`
 

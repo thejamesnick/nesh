@@ -109,7 +109,7 @@ func TestErrorPositions(t *testing.T) {
 		{"let x = \n", 1},           // missing value
 		{"print 1 +\n", 1},          // dangling operator
 		{"let x = (1 + 2\n", 1},     // unclosed paren
-		{"ls -la\n", 1},             // not a Phase 1 statement
+		{"let\n", 1},                // let without name
 	}
 	for _, c := range cases {
 		_, err := Parse(c.src)

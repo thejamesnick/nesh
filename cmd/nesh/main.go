@@ -12,6 +12,7 @@ import (
 
 	"nesh/internal/parser"
 	"nesh/internal/runtime"
+	"nesh/internal/shell"
 )
 
 const version = "0.1.0"
@@ -70,6 +71,7 @@ func execSource(src string) int {
 	}
 	out := bufio.NewWriter(os.Stdout)
 	rt := runtime.New(out)
+	rt.SetRunner(shell.RealRunner{})
 	if rerr := rt.Run(script); rerr != nil {
 		out.Flush()
 		fmt.Fprintf(os.Stderr, "error: %v\n", rerr)
@@ -89,6 +91,7 @@ func repl(in *os.File, outFile *os.File) int {
 		fmt.Fprintf(w, "Nesh %s\n", version)
 	}
 	rt := runtime.New(w)
+	rt.SetRunner(shell.RealRunner{})
 	sc := bufio.NewScanner(in)
 	for {
 		if interactive {

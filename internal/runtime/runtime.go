@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"nesh/internal/ast"
+	"nesh/internal/shell"
 )
 
 // Output is where print writes. cmd/nesh wires it to stdout.
@@ -78,16 +79,21 @@ func Truthy(v Value) bool {
 
 // Runtime executes scripts against a scope stack: scopes[0] is globals,
 // each function call pushes one local scope (which is what recursion and
-// the REPL need).
+// the REPL need). System commands run through the injected CommandRunner;
+// without one, command syntax is a runtime error (keeps tests OS-free).
 type Runtime struct {
 	out    Output
 	scopes []map[string]Value
+	runner shell.CommandRunner
 }
 
 // New builds a Runtime writing to out.
 func New(out Output) *Runtime {
 	return &Runtime{out: out, scopes: []map[string]Value{{}}}
 }
+
+// SetRunner enables system commands (`git status`, `run ...`).
+func (r *Runtime) SetRunner(runner shell.CommandRunner) { r.runner = runner }
 
 // Run executes every statement in script. A top-level `return` is an error.
 func (r *Runtime) Run(script *ast.Script) *Error {
@@ -173,6 +179,9 @@ func (r *Runtime) execStmt(stmt ast.Stmt) (*returnValue, *Error) {
 				return ret, err
 			}
 		}
+	case *ast.CmdStmt:
+		_, err := r.runCommand(s.Pos, s.Name, s.Args)
+		return nil, err
 	case *ast.FnStmt:
 		r.scopes[0][s.Name] = &Func{Name: s.Name, Params: s.Params, Body: s.Body}
 		return nil, nil
@@ -210,6 +219,12 @@ func (r *Runtime) eval(e ast.Expr) (Value, *Error) {
 		return nil, errAt(n.Pos, "undefined variable: %s", n.Name)
 	case *ast.CallExpr:
 		return r.call(n)
+	case *ast.RunExpr:
+		code, err := r.runCommand(n.Pos, n.Name, n.Args)
+		if err != nil {
+			return nil, err
+		}
+		return Int(code), nil
 	case *ast.PrefixExpr:
 		v, err := r.eval(n.Right)
 		if err != nil {
@@ -235,6 +250,25 @@ func (r *Runtime) eval(e ast.Expr) (Value, *Error) {
 	default:
 		return nil, errAt(e.Position(), "cannot evaluate %T", e)
 	}
+}
+
+// outputWriter adapts the Output sink to io.Writer for command streams.
+type outputWriter struct{ o Output }
+
+func (w outputWriter) Write(p []byte) (int, error) { return w.o.WriteString(string(p)) }
+
+// runCommand executes a system command through the injected runner.
+func (r *Runtime) runCommand(pos ast.Pos, name string, args []string) (int, *Error) {
+	if r.runner == nil {
+		return 0, errAt(pos, "system commands are not available here")
+	}
+	if v, ok := r.lookup(name); ok {
+		if _, isFn := v.(*Func); !isFn {
+			return 0, errAt(pos, "%s is a variable, not a command — did you mean print %s?", name, name)
+		}
+	}
+	w := outputWriter{r.out}
+	return r.runner.Run(name, args, w, w), nil
 }
 
 // call evaluates a function call: args bind as locals in a fresh scope.
