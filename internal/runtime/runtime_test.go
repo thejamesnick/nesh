@@ -230,7 +230,7 @@ func TestIfParseErrors(t *testing.T) {
 	cases := []struct{ src, want string }{
 		{"if x > 5\nprint 1\nend\n", `1:9: expected "then", got "\n"`},
 		{"if true then\nprint 1\n", `3:1: expected "end", got ""`},
-		{"elif true then\nend\n", `1:1: expected statement (let, print, or if), got "elif"`},
+		{"elif true then\nend\n", `1:1: expected statement (let, print, if, or fn), got "elif"`},
 	}
 	for _, c := range cases {
 		script, perr := parser.Parse(c.src)
@@ -248,6 +248,76 @@ func TestIfRuntimeErrorPosition(t *testing.T) {
 	_, err := run(t, "if true then\nprint missing\nend\n")
 	if err == nil || err.Error() != "2:7: undefined variable: missing" {
 		t.Fatalf("got %v, want position inside the taken branch", err)
+	}
+}
+
+func TestFunctions(t *testing.T) {
+	cases := []struct{ src, want string }{
+		// define + call, return value
+		{"fn add(a, b)\nreturn a + b\nend\nprint add(2, 3)\n", "5\n"},
+		// call inside expressions
+		{"fn double(x)\nreturn x * 2\nend\nprint double(4) + 1\n", "9\n"},
+		{"fn gt(a, b)\nreturn a > b\nend\nif gt(10, 5) then\nprint \"yes\"\nend\n", "yes\n"},
+		// implicit return is false
+		{"fn noop()\nend\nprint noop()\n", "false\n"},
+		{"fn noop()\nend\nif not noop() then\nprint \"falsy\"\nend\n", "falsy\n"},
+		// bare return
+		{"fn f(x)\nif x > 0 then\nreturn\nend\nreturn 99\nend\nprint f(1)\nprint f(-1)\n", "false\n99\n"},
+		// recursion: factorial and fibonacci
+		{"fn fact(n)\nif n <= 1 then\nreturn 1\nend\nreturn n * fact(n - 1)\nend\nprint fact(6)\n", "720\n"},
+		{"fn fib(n)\nif n < 2 then\nreturn n\nend\nreturn fib(n - 1) + fib(n - 2)\nend\nprint fib(10)\n", "55\n"},
+		// params are locals; reads fall back to globals
+		{"let g = 100\nfn f(x)\nreturn x + g\nend\nprint f(1)\n", "101\n"},
+		// let inside fn is local — global unchanged
+		{"let x = \"global\"\nfn f()\nlet x = \"local\"\nreturn x\nend\nprint f()\nprint x\n", "local\nglobal\n"},
+		// param shadows global for reads
+		{"let x = 1\nfn f(x)\nreturn x + 10\nend\nprint f(5)\nprint x\n", "15\n1\n"},
+		// functions compose
+		{"fn inc(n)\nreturn n + 1\nend\nprint inc(inc(inc(0)))\n", "3\n"},
+		// strings through functions
+		{"fn greet(name)\nreturn \"hi \" + name\nend\nprint greet(\"nesh\")\n", "hi nesh\n"},
+	}
+	for _, c := range cases {
+		out, err := run(t, c.src)
+		if err != nil {
+			t.Errorf("%q: unexpected error %v", c.src, err)
+			continue
+		}
+		if out != c.want {
+			t.Errorf("%q: got %q, want %q", c.src, out, c.want)
+		}
+	}
+}
+
+func TestFunctionErrors(t *testing.T) {
+	cases := []struct{ src, want string }{
+		{"print nope(1)\n", "1:7: undefined function: nope"},
+		{"let x = 5\nprint x(1)\n", `2:7: x is not a function (it is 5)`},
+		{"fn f(a)\nreturn a\nend\nprint f()\n", "4:7: f expects 1 argument(s), got 0"},
+		{"fn f(a)\nreturn a\nend\nprint f(1, 2)\n", "4:7: f expects 1 argument(s), got 2"},
+		{"fn f()\nreturn missing\nend\nprint f()\n", "2:8: undefined variable: missing"},
+		{"return 5\n", "1:1: return outside function"},
+	}
+	for _, c := range cases {
+		_, err := run(t, c.src)
+		if err == nil {
+			t.Errorf("%q: expected error, got none", c.src)
+			continue
+		}
+		if err.Error() != c.want {
+			t.Errorf("%q: got %q, want %q", c.src, err.Error(), c.want)
+		}
+	}
+}
+
+func TestBareCallStatement(t *testing.T) {
+	out, err := run(t, "fn deploy(env)\nprint \"deploying to\" env\nend\ndeploy(\"prod\")\n")
+	if err != nil || out != "deploying to prod\n" {
+		t.Fatalf("bare call statement failed: %q, %v", out, err)
+	}
+	// non-call bare identifiers stay a syntax error
+	if _, perr := parser.Parse("x\n"); perr == nil {
+		t.Fatal("bare ident should not parse as a statement")
 	}
 }
 

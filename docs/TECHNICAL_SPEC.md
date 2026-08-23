@@ -134,9 +134,26 @@ blocks is optional style, not syntax; blocks are closed by keywords.
 
 ```
 fn greet(name)
-  print "hello" name
+  return "hello " + name
 end
+
+print greet("world")     # call as expression
+deploy("prod")           # call as statement (side effects)
 ```
+
+### Scoping rules (the whole story)
+
+1. Function **parameters** are locals of each call.
+2. A `let` inside a function creates a **local**; outside, a global.
+3. Reads fall back to outer scopes (locals → globals).
+4. Redefining a global from inside a function is impossible with `let` —
+   use explicit returns to hand values back.
+5. Functions themselves live in the **global** scope.
+6. A function without an explicit `return` yields `false`.
+7. Recursion works (each call gets a fresh scope).
+
+Arity is strict: calling with the wrong number of arguments is a runtime
+error at the call site.
 
 ---
 

@@ -100,10 +100,81 @@ func (p *parser) parseStmt() (ast.Stmt, bool) {
 		return p.parsePrint()
 	case token.IF:
 		return p.parseIf()
+	case token.FN:
+		return p.parseFn()
+	case token.RETURN:
+		return p.parseReturn()
+	case token.IDENT:
+		if p.peek.Type == token.LPAREN {
+			call, ok := p.parseCall(p.cur.Literal, ast.Pos{Line: p.cur.Line, Column: p.cur.Column})
+			if !ok {
+				return nil, false
+			}
+			return &ast.ExprStmt{Pos: call.Position(), Expr: call}, true
+		}
+		p.fail("expected statement (let, print, if, or fn), got %q", p.cur.Literal)
+		return nil, false
 	default:
-		p.fail("expected statement (let, print, or if), got %q", p.cur.Literal)
+		p.fail("expected statement (let, print, if, or fn), got %q", p.cur.Literal)
 		return nil, false
 	}
+}
+
+func (p *parser) parseFn() (ast.Stmt, bool) {
+	pos := ast.Pos{Line: p.cur.Line, Column: p.cur.Column}
+	p.next() // consume 'fn'
+	if !p.at(token.IDENT) {
+		p.fail("expected function name after fn, got %q", p.cur.Literal)
+		return nil, false
+	}
+	name := p.cur.Literal
+	p.next()
+	if !p.expect(token.LPAREN) {
+		return nil, false
+	}
+	var params []string
+	if !p.at(token.RPAREN) {
+		for {
+			if !p.at(token.IDENT) {
+				p.fail("expected parameter name, got %q", p.cur.Literal)
+				return nil, false
+			}
+			params = append(params, p.cur.Literal)
+			p.next()
+			if p.at(token.COMMA) {
+				p.next()
+				continue
+			}
+			break
+		}
+	}
+	if !p.expect(token.RPAREN) {
+		return nil, false
+	}
+	body, ok := p.parseBlock(token.END)
+	if !ok {
+		return nil, false
+	}
+	if !p.expect(token.END) {
+		return nil, false
+	}
+	return &ast.FnStmt{Pos: pos, Name: name, Params: params, Body: body}, true
+}
+
+func (p *parser) parseReturn() (ast.Stmt, bool) {
+	pos := ast.Pos{Line: p.cur.Line, Column: p.cur.Column}
+	node := &ast.ReturnStmt{Pos: pos}
+	p.next() // consume 'return'
+	switch p.cur.Type {
+	case token.NEWLINE, token.EOF, token.END, token.ELSE, token.ELIF:
+		return node, true
+	}
+	v, ok := p.parseExpr(precLowest)
+	if !ok {
+		return nil, false
+	}
+	node.Value = v
+	return node, true
 }
 
 func (p *parser) parseLet() (ast.Stmt, bool) {
@@ -277,6 +348,33 @@ func (p *parser) parseExpr(minPrec int) (ast.Expr, bool) {
 	}
 }
 
+// parseCall parses `name(arg1, ...)`; cur is the name token, peek is '('.
+func (p *parser) parseCall(name string, pos ast.Pos) (ast.Expr, bool) {
+	call := &ast.CallExpr{Pos: pos, Name: name}
+	p.next() // now at '('
+	p.next() // past '('
+	if !p.at(token.RPAREN) {
+		for {
+			arg, ok := p.parseExpr(precLowest)
+			if !ok {
+				return nil, false
+			}
+			call.Args = append(call.Args, arg)
+			if p.at(token.COMMA) {
+				p.next()
+				continue
+			}
+			break
+		}
+	}
+	if !p.at(token.RPAREN) {
+		p.fail("expected ) to close call of %s, got %q", name, p.cur.Literal)
+		return nil, false
+	}
+	p.next()
+	return call, true
+}
+
 func (p *parser) parseUnary() (ast.Expr, bool) {
 	if p.at(token.MINUS) || p.at(token.NOT) {
 		pos := ast.Pos{Line: p.cur.Line, Column: p.cur.Column}
@@ -296,6 +394,9 @@ func (p *parser) parsePrimary() (ast.Expr, bool) {
 	switch p.cur.Type {
 	case token.IDENT:
 		name := p.cur.Literal
+		if p.peek.Type == token.LPAREN {
+			return p.parseCall(name, pos)
+		}
 		p.next()
 		return &ast.Ident{Pos: pos, Name: name}, true
 	case token.INT:

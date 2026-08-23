@@ -54,6 +54,27 @@ type IfStmt struct {
 	Else []Stmt
 }
 
+// FnStmt is `fn name(params) ... end`. Functions are defined globally.
+type FnStmt struct {
+	Pos    Pos
+	Name   string
+	Params []string
+	Body   []Stmt
+}
+
+// ReturnStmt is `return [expr]`; Value may be nil (implicit false).
+type ReturnStmt struct {
+	Pos   Pos
+	Value Expr
+}
+
+// ExprStmt is a bare expression used as a statement — only calls today
+// (e.g. `deploy("prod")` for its side effect).
+type ExprStmt struct {
+	Pos  Pos
+	Expr Expr
+}
+
 // Ident is a variable reference.
 type Ident struct {
 	Pos  Pos
@@ -91,11 +112,18 @@ type PrefixExpr struct {
 	Right Expr
 }
 
-// InfixExpr is a binary operation: + - * /
+// InfixExpr is a binary operation: + - * / == != < > <= >= and or
 type InfixExpr struct {
 	Pos  Pos
 	Op   string
 	L, R Expr
+}
+
+// CallExpr is a function call: name(arg1, arg2, ...).
+type CallExpr struct {
+	Pos  Pos
+	Name string
+	Args []Expr
 }
 
 func (s *Script) Position() Pos {
@@ -108,6 +136,9 @@ func (s *Script) Position() Pos {
 func (s *LetStmt) Position() Pos    { return s.Pos }
 func (s *PrintStmt) Position() Pos  { return s.Pos }
 func (s *IfStmt) Position() Pos     { return s.Pos }
+func (s *FnStmt) Position() Pos     { return s.Pos }
+func (s *ReturnStmt) Position() Pos { return s.Pos }
+func (s *ExprStmt) Position() Pos   { return s.Expr.Position() }
 func (e *Ident) Position() Pos      { return e.Pos }
 func (e *IntLit) Position() Pos     { return e.Pos }
 func (e *FloatLit) Position() Pos   { return e.Pos }
@@ -115,10 +146,14 @@ func (e *StringLit) Position() Pos  { return e.Pos }
 func (e *BoolLit) Position() Pos    { return e.Pos }
 func (e *PrefixExpr) Position() Pos { return e.Pos }
 func (e *InfixExpr) Position() Pos  { return e.Pos }
+func (e *CallExpr) Position() Pos   { return e.Pos }
 
-func (*LetStmt) stmtNode()   {}
-func (*PrintStmt) stmtNode() {}
-func (*IfStmt) stmtNode()    {}
+func (*LetStmt) stmtNode()    {}
+func (*PrintStmt) stmtNode()  {}
+func (*IfStmt) stmtNode()     {}
+func (*FnStmt) stmtNode()     {}
+func (*ReturnStmt) stmtNode() {}
+func (*ExprStmt) stmtNode()   {}
 
 func (*Ident) exprNode()      {}
 func (*IntLit) exprNode()     {}
@@ -127,3 +162,4 @@ func (*StringLit) exprNode()  {}
 func (*BoolLit) exprNode()    {}
 func (*PrefixExpr) exprNode() {}
 func (*InfixExpr) exprNode()  {}
+func (*CallExpr) exprNode()   {}

@@ -40,6 +40,13 @@ type Float float64
 type Str string
 type Bool bool
 
+// Func is a user-defined function. Functions live in the global scope.
+type Func struct {
+	Name   string
+	Params []string
+	Body   []ast.Stmt
+}
+
 func (v Int) String() string   { return strconv.FormatInt(int64(v), 10) }
 func (v Float) String() string { return strconv.FormatFloat(float64(v), 'g', -1, 64) }
 func (v Str) String() string   { return string(v) }
@@ -49,6 +56,7 @@ func (v Bool) String() string {
 	}
 	return "false"
 }
+func (f *Func) String() string { return "<fn " + f.Name + ">" }
 
 // Truthy reports the Nesh truthiness of a value:
 // false for Bool(false), Int(0), Float(0.0), Str(""); true otherwise.
@@ -68,75 +76,108 @@ func Truthy(v Value) bool {
 	}
 }
 
-// Runtime executes scripts against a persistent scope (globals survive
-// across Run calls, which is what the REPL needs).
+// Runtime executes scripts against a scope stack: scopes[0] is globals,
+// each function call pushes one local scope (which is what recursion and
+// the REPL need).
 type Runtime struct {
-	out     Output
-	globals map[string]Value
+	out    Output
+	scopes []map[string]Value
 }
 
 // New builds a Runtime writing to out.
 func New(out Output) *Runtime {
-	return &Runtime{out: out, globals: make(map[string]Value)}
+	return &Runtime{out: out, scopes: []map[string]Value{{}}}
 }
 
-// Run executes every statement in script.
+// Run executes every statement in script. A top-level `return` is an error.
 func (r *Runtime) Run(script *ast.Script) *Error {
-	for _, stmt := range script.Stmts {
-		if err := r.execStmt(stmt); err != nil {
-			return err
-		}
+	ret, err := r.execBlock(script.Stmts)
+	if err != nil {
+		return err
+	}
+	if ret != nil {
+		return errAt(ret.pos, "return outside function")
 	}
 	return nil
 }
 
 // Global returns a global variable (REPL/tests); ok=false if undefined.
 func (r *Runtime) Global(name string) (Value, bool) {
-	v, ok := r.globals[name]
-	return v, ok
+	return r.lookup(name)
 }
 
-func (r *Runtime) execStmt(stmt ast.Stmt) *Error {
+func (r *Runtime) lookup(name string) (Value, bool) {
+	for i := len(r.scopes) - 1; i >= 0; i-- {
+		if v, ok := r.scopes[i][name]; ok {
+			return v, true
+		}
+	}
+	return nil, false
+}
+
+// returnValue signals `return` unwinding to the nearest enclosing call.
+type returnValue struct {
+	v   Value
+	pos ast.Pos
+}
+
+func (r *Runtime) execBlock(stmts []ast.Stmt) (*returnValue, *Error) {
+	for _, stmt := range stmts {
+		ret, err := r.execStmt(stmt)
+		if err != nil || ret != nil {
+			return ret, err
+		}
+	}
+	return nil, nil
+}
+
+func (r *Runtime) execStmt(stmt ast.Stmt) (*returnValue, *Error) {
 	switch s := stmt.(type) {
 	case *ast.LetStmt:
 		v, err := r.eval(s.Value)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		r.globals[s.Name] = v
-		return nil
+		r.scopes[len(r.scopes)-1][s.Name] = v // let always binds in the current scope
+		return nil, nil
 	case *ast.PrintStmt:
 		parts := make([]string, len(s.Args))
 		for i, arg := range s.Args {
 			v, err := r.eval(arg)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			parts[i] = v.String()
 		}
 		r.out.WriteString(strings.Join(parts, " ") + "\n")
-		return nil
+		return nil, nil
 	case *ast.IfStmt:
 		cond, err := r.eval(s.Cond)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if Truthy(cond) {
-			return r.execStmts(s.Then)
+			return r.execBlock(s.Then)
 		}
-		return r.execStmts(s.Else)
+		return r.execBlock(s.Else)
+	case *ast.FnStmt:
+		r.scopes[0][s.Name] = &Func{Name: s.Name, Params: s.Params, Body: s.Body}
+		return nil, nil
+	case *ast.ExprStmt:
+		_, err := r.eval(s.Expr) // value discarded; called for side effects
+		return nil, err
+	case *ast.ReturnStmt:
+		if s.Value == nil {
+			return &returnValue{v: Bool(false), pos: s.Pos}, nil
+		}
+		v, err := r.eval(s.Value)
+		if err != nil {
+			return nil, err
+		}
+		return &returnValue{v: v, pos: s.Pos}, nil
 	default:
-		return errAt(stmt.Position(), "cannot execute %T", stmt)
+		return nil, errAt(stmt.Position(), "cannot execute %T", stmt)
 	}
-}
-
-func (r *Runtime) execStmts(stmts []ast.Stmt) *Error {
-	for _, stmt := range stmts {
-		if err := r.execStmt(stmt); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (r *Runtime) eval(e ast.Expr) (Value, *Error) {
@@ -150,10 +191,12 @@ func (r *Runtime) eval(e ast.Expr) (Value, *Error) {
 	case *ast.BoolLit:
 		return Bool(n.Value), nil
 	case *ast.Ident:
-		if v, ok := r.globals[n.Name]; ok {
+		if v, ok := r.lookup(n.Name); ok {
 			return v, nil
 		}
 		return nil, errAt(n.Pos, "undefined variable: %s", n.Name)
+	case *ast.CallExpr:
+		return r.call(n)
 	case *ast.PrefixExpr:
 		v, err := r.eval(n.Right)
 		if err != nil {
@@ -179,6 +222,39 @@ func (r *Runtime) eval(e ast.Expr) (Value, *Error) {
 	default:
 		return nil, errAt(e.Position(), "cannot evaluate %T", e)
 	}
+}
+
+// call evaluates a function call: args bind as locals in a fresh scope.
+func (r *Runtime) call(n *ast.CallExpr) (Value, *Error) {
+	fnVal, ok := r.lookup(n.Name)
+	if !ok {
+		return nil, errAt(n.Pos, "undefined function: %s", n.Name)
+	}
+	f, ok := fnVal.(*Func)
+	if !ok {
+		return nil, errAt(n.Pos, "%s is not a function (it is %s)", n.Name, fnVal)
+	}
+	if len(n.Args) != len(f.Params) {
+		return nil, errAt(n.Pos, "%s expects %d argument(s), got %d", f.Name, len(f.Params), len(n.Args))
+	}
+	scope := make(map[string]Value, len(f.Params))
+	for i, argExpr := range n.Args {
+		v, err := r.eval(argExpr) // args evaluated in the caller's scope
+		if err != nil {
+			return nil, err
+		}
+		scope[f.Params[i]] = v
+	}
+	r.scopes = append(r.scopes, scope)
+	ret, err := r.execBlock(f.Body)
+	r.scopes = r.scopes[:len(r.scopes)-1]
+	if err != nil {
+		return nil, err
+	}
+	if ret != nil {
+		return ret.v, nil
+	}
+	return Bool(false), nil // no explicit return → false (documented)
 }
 
 func (r *Runtime) evalInfix(n *ast.InfixExpr) (Value, *Error) {
