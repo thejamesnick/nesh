@@ -31,6 +31,7 @@ func (p Pos) MarshalJSON() ([]byte, error) {
 func (s *Script) MarshalJSON() ([]byte, error) { return json.Marshal(s.Stmts) }
 
 func (s *LetStmt) MarshalJSON() ([]byte, error)    { return withKind("let", *s) }
+func (s *ImportStmt) MarshalJSON() ([]byte, error) { return withKind("import", *s) }
 func (s *PrintStmt) MarshalJSON() ([]byte, error)  { return withKind("print", *s) }
 func (s *IfStmt) MarshalJSON() ([]byte, error)     { return withKind("if", *s) }
 func (s *FnStmt) MarshalJSON() ([]byte, error)     { return withKind("fn", *s) }

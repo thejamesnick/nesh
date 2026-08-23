@@ -107,6 +107,31 @@ func TestOpenBlocks(t *testing.T) {
 	}
 }
 
+func TestImportStatements(t *testing.T) {
+	s, err := Parse("import \"a.nsh\" as lib\nimport \"b.nsh\"\n")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	imp1, ok := s.Stmts[0].(*ast.ImportStmt)
+	if !ok || imp1.Path != "a.nsh" || imp1.Alias != "lib" {
+		t.Fatalf("aliased import wrong: %#v", s.Stmts[0])
+	}
+	imp2 := s.Stmts[1].(*ast.ImportStmt)
+	if imp2.Path != "b.nsh" || imp2.Alias != "" {
+		t.Fatalf("plain import wrong: %#v", imp2)
+	}
+
+	cases := []struct{ src, want string }{
+		{"import 5\n", `1:8: expected module path string after import, got "5"`},
+		{"import \"x\" as\nend\n", `1:14: expected alias name after as, got "\n"`},
+	}
+	for _, c := range cases {
+		if _, perr := Parse(c.src); perr == nil || perr.Error() != c.want {
+			t.Errorf("%q: got %v, want %s", c.src, perr, c.want)
+		}
+	}
+}
+
 func TestCommandErrors(t *testing.T) {
 	cases := []struct{ src, want string }{
 		{"run\n", `1:4: expected command name after run, got "\n"`},

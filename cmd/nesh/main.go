@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"nesh/internal/ast"
 	"nesh/internal/builtin"
@@ -76,7 +77,7 @@ func execFile(path string) int {
 		fmt.Fprintf(os.Stderr, "nesh: %v\n", err)
 		return 2
 	}
-	return execSource(string(src))
+	return execSourceIn(string(src), filepath.Dir(path))
 }
 
 // jsonReport is the agent-API document emitted by nesh --json.
@@ -113,7 +114,7 @@ func emitJSON(report jsonReport) int {
 	}
 }
 
-func runWithEvents(src string) (*ast.Script, []runtime.Event, *parser.Error, *runtime.Error) {
+func runWithEvents(src, baseDir string) (*ast.Script, []runtime.Event, *parser.Error, *runtime.Error) {
 	script, perr := parser.Parse(src)
 	if perr != nil {
 		return nil, nil, perr, nil
@@ -121,14 +122,23 @@ func runWithEvents(src string) (*ast.Script, []runtime.Event, *parser.Error, *ru
 	var events []runtime.Event
 	rt := runtime.New(bufio.NewWriter(io.Discard))
 	rt.SetRunner(shell.RealRunner{})
+	rt.SetBaseDir(baseDir)
 	builtin.RegisterAll(rt, shell.RealFS{})
+	rt.SetFileSystem(shell.RealFS{})
+	rt.SetRuntimeFactory(func(child *runtime.Runtime) {
+		builtin.RegisterAll(child, shell.RealFS{})
+	})
 	rt.SetEventSink(func(e runtime.Event) { events = append(events, e) })
 	rerr := rt.Run(script)
 	return script, events, nil, rerr
 }
 
 func execSourceJSON(src string) int {
-	script, events, perr, rerr := runWithEvents(src)
+	return execSourceJSONIn(src, "")
+}
+
+func execSourceJSONIn(src, baseDir string) int {
+	script, events, perr, rerr := runWithEvents(src, baseDir)
 	report := jsonReport{Status: "ok", Events: events, Ast: script}
 	if perr != nil {
 		report.Status = "parse_error"
@@ -147,10 +157,14 @@ func execFileJSON(path string) int {
 	if err != nil {
 		return emitJSON(jsonReport{Status: "io_error"})
 	}
-	return execSourceJSON(string(src))
+	return execSourceJSONIn(string(src), filepath.Dir(path))
 }
 
 func execSource(src string) int {
+	return execSourceIn(src, "")
+}
+
+func execSourceIn(src, baseDir string) int {
 	script, perr := parser.Parse(src)
 	if perr != nil {
 		fmt.Fprintf(os.Stderr, "parse error: %v\n", perr)
@@ -159,7 +173,12 @@ func execSource(src string) int {
 	out := bufio.NewWriter(os.Stdout)
 	rt := runtime.New(out)
 	rt.SetRunner(shell.RealRunner{})
+	rt.SetBaseDir(baseDir)
 	builtin.RegisterAll(rt, shell.RealFS{})
+	rt.SetFileSystem(shell.RealFS{})
+	rt.SetRuntimeFactory(func(child *runtime.Runtime) {
+		builtin.RegisterAll(child, shell.RealFS{})
+	})
 	if rerr := rt.Run(script); rerr != nil {
 		out.Flush()
 		fmt.Fprintf(os.Stderr, "error: %v\n", rerr)
@@ -194,6 +213,10 @@ func repl(in *os.File, outFile *os.File) int {
 	rt := runtime.New(w)
 	rt.SetRunner(shell.RealRunner{})
 	builtin.RegisterAll(rt, shell.RealFS{})
+	rt.SetFileSystem(shell.RealFS{})
+	rt.SetRuntimeFactory(func(child *runtime.Runtime) {
+		builtin.RegisterAll(child, shell.RealFS{})
+	})
 	for {
 		line, err := rl.ReadLine("nesh> ")
 		if err == io.EOF || line == "exit" && err == nil {

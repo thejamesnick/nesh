@@ -91,6 +91,15 @@ type ForStmt struct {
 	Body []Stmt `json:"body"`
 }
 
+// ImportStmt is `import "path.nsh" [as alias]`.
+// Without an alias, the module's definitions merge into globals; with one,
+// they are reachable via dotted access (alias.name).
+type ImportStmt struct {
+	Pos   Pos    `json:"pos"`
+	Path  string `json:"path"`
+	Alias string `json:"alias,omitempty"`
+}
+
 // CmdStmt is a bare system command: `git status --short`. Words are literal
 // (no variable expansion yet — Phase 3 decision).
 type CmdStmt struct {
@@ -166,6 +175,7 @@ func (s *Script) Position() Pos {
 	return s.Stmts[0].Position()
 }
 
+func (s *ImportStmt) Position() Pos { return s.Pos }
 func (s *LetStmt) Position() Pos    { return s.Pos }
 func (s *PrintStmt) Position() Pos  { return s.Pos }
 func (s *IfStmt) Position() Pos     { return s.Pos }
@@ -185,6 +195,7 @@ func (e *PrefixExpr) Position() Pos { return e.Pos }
 func (e *InfixExpr) Position() Pos  { return e.Pos }
 func (e *CallExpr) Position() Pos   { return e.Pos }
 
+func (*ImportStmt) stmtNode() {}
 func (*LetStmt) stmtNode()    {}
 func (*PrintStmt) stmtNode()  {}
 func (*IfStmt) stmtNode()     {}

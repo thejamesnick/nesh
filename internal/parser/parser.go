@@ -124,6 +124,8 @@ func (p *parser) parseStmt() (ast.Stmt, bool) {
 		return p.parseWhile()
 	case token.FOR:
 		return p.parseFor()
+	case token.IMPORT:
+		return p.parseImport()
 	case token.RETURN:
 		return p.parseReturn()
 	case token.IDENT:
@@ -250,6 +252,28 @@ func (p *parser) parseCmdWord() (string, bool) {
 		p.fail("commands take simple words only (strings, numbers, flags), got %q — for expressions use print/if/let", p.cur.Literal)
 		return "", false
 	}
+}
+
+func (p *parser) parseImport() (ast.Stmt, bool) {
+	pos := ast.Pos{Line: p.cur.Line, Column: p.cur.Column}
+	p.next() // consume 'import'
+	if p.cur.Type != token.STRING {
+		p.fail("expected module path string after import, got %q", p.cur.Literal)
+		return nil, false
+	}
+	path := p.cur.Literal
+	p.next()
+	alias := ""
+	if p.at(token.AS) {
+		p.next()
+		if !p.at(token.IDENT) {
+			p.fail("expected alias name after as, got %q", p.cur.Literal)
+			return nil, false
+		}
+		alias = p.cur.Literal
+		p.next()
+	}
+	return &ast.ImportStmt{Pos: pos, Path: path, Alias: alias}, true
 }
 
 func (p *parser) parseWhile() (ast.Stmt, bool) {

@@ -55,6 +55,8 @@ const (
 	FALSE  Type = "false"
 	ELIF   Type = "elif"
 	RUN    Type = "run"
+	IMPORT Type = "import"
+	AS     Type = "as"
 )
 
 var keywords = map[string]Type{
@@ -65,6 +67,8 @@ var keywords = map[string]Type{
 	"else":   ELSE,
 	"elif":   ELIF,
 	"run":    RUN,
+	"import": IMPORT,
+	"as":     AS,
 	"end":    END,
 	"fn":     FN,
 	"return": RETURN,

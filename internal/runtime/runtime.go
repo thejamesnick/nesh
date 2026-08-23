@@ -8,10 +8,12 @@ package runtime
 import (
 	"cmp"
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	"nesh/internal/ast"
+	"nesh/internal/parser"
 	"nesh/internal/shell"
 )
 
@@ -62,11 +64,21 @@ type Builtin struct {
 
 func (b *Builtin) String() string { return "<builtin " + b.Name + ">" }
 
-// Func is a user-defined function. Functions live in the global scope.
+// Module is an imported file's exported definitions.
+type Module struct {
+	Name    string
+	Exports map[string]Value
+}
+
+func (m *Module) String() string { return "<module " + m.Name + ">" }
+
+// Func is a user-defined function. It captures its defining scope chain
+// (lexical scoping), so module functions see module state, not caller state.
 type Func struct {
 	Name   string
 	Params []string
 	Body   []ast.Stmt
+	env    []map[string]Value // defining environment (globals + enclosing scopes)
 }
 
 func (v Int) String() string   { return strconv.FormatInt(int64(v), 10) }
@@ -103,15 +115,20 @@ func Truthy(v Value) bool {
 // the REPL need). System commands run through the injected CommandRunner;
 // without one, command syntax is a runtime error (keeps tests OS-free).
 type Runtime struct {
-	out    Output
-	scopes []map[string]Value
-	runner shell.CommandRunner
-	events func(Event)
+	out      Output
+	scopes   []map[string]Value
+	runner   shell.CommandRunner
+	events   func(Event)
+	fs       shell.FileSystem
+	baseDir  string
+	factory  func(*Runtime)     // prepares child runtimes (builtins etc.)
+	modCache map[string]*Module // resolved absolute path → module
+	loading  map[string]bool    // cycle detection
 }
 
 // New builds a Runtime writing to out.
 func New(out Output) *Runtime {
-	return &Runtime{out: out, scopes: []map[string]Value{{}}}
+	return &Runtime{out: out, scopes: []map[string]Value{{}}, loading: map[string]bool{}, modCache: map[string]*Module{}}
 }
 
 // SetRunner enables system commands (`git status`, `run ...`).
@@ -121,6 +138,16 @@ func (r *Runtime) SetRunner(runner shell.CommandRunner) { r.runner = runner }
 func (r *Runtime) Define(name string, fn func(args []Value) (Value, error)) {
 	r.scopes[0][name] = &Builtin{Name: name, Fn: fn}
 }
+
+// SetFileSystem enables file builtins and imports.
+func (r *Runtime) SetFileSystem(fs shell.FileSystem) { r.fs = fs }
+
+// SetBaseDir anchors relative import paths (set to the script's directory).
+func (r *Runtime) SetBaseDir(dir string) { r.baseDir = dir }
+
+// SetRuntimeFactory registers a callback preparing child runtimes created
+// for module loading (e.g. re-registering builtins).
+func (r *Runtime) SetRuntimeFactory(fn func(*Runtime)) { r.factory = fn }
 
 // Event is one structured execution step for the agent API (nesh --json).
 type Event struct {
@@ -257,8 +284,10 @@ func (r *Runtime) execStmt(stmt ast.Stmt) (*returnValue, *Error) {
 	case *ast.CmdStmt:
 		_, err := r.runCommand(s.Pos, s.Name, s.Args)
 		return nil, err
+	case *ast.ImportStmt:
+		return nil, r.doImport(s)
 	case *ast.FnStmt:
-		r.scopes[0][s.Name] = &Func{Name: s.Name, Params: s.Params, Body: s.Body}
+		r.scopes[0][s.Name] = &Func{Name: s.Name, Params: s.Params, Body: s.Body, env: r.scopes}
 		return nil, nil
 	case *ast.ExprStmt:
 		_, err := r.eval(s.Expr) // value discarded; called for side effects
@@ -288,6 +317,9 @@ func (r *Runtime) eval(e ast.Expr) (Value, *Error) {
 	case *ast.BoolLit:
 		return Bool(n.Value), nil
 	case *ast.Ident:
+		if strings.Contains(n.Name, ".") {
+			return r.resolveDotted(n)
+		}
 		if v, ok := r.lookup(n.Name); ok {
 			return v, nil
 		}
@@ -327,6 +359,82 @@ func (r *Runtime) eval(e ast.Expr) (Value, *Error) {
 	}
 }
 
+// doImport loads a module: resolve path, cache, detect cycles, execute in
+// an isolated child runtime, then bind (alias) or merge (no alias).
+func (r *Runtime) doImport(s *ast.ImportStmt) *Error {
+	if r.fs == nil {
+		return errAt(s.Pos, "imports need a filesystem — not available here")
+	}
+	resolved := s.Path
+	if !filepath.IsAbs(resolved) {
+		resolved = filepath.Join(r.baseDir, resolved)
+	}
+
+	if mod, cached := r.modCache[resolved]; cached {
+		return r.bindModule(s, mod)
+	}
+	if r.loading[resolved] {
+		return errAt(s.Pos, "circular import of %s", filepath.Base(resolved))
+	}
+
+	data, ferr := r.fs.ReadFile(resolved)
+	if ferr != nil {
+		return errAt(s.Pos, "cannot read module %s: %v", s.Path, ferr)
+	}
+	script, perr := parser.Parse(string(data))
+	if perr != nil {
+		return errAt(s.Pos, "in %s: %v", filepath.Base(resolved), perr)
+	}
+
+	child := &Runtime{
+		out:      r.out,
+		scopes:   []map[string]Value{{}},
+		runner:   r.runner,
+		events:   r.events,
+		fs:       r.fs,
+		baseDir:  filepath.Dir(resolved),
+		factory:  r.factory,
+		modCache: r.modCache, // shared so cross-module imports deduplicate
+		loading:  r.loading,
+	}
+	if r.factory != nil {
+		r.factory(child)
+	}
+
+	r.loading[resolved] = true
+	ret, rerr := child.execBlock(script.Stmts)
+	delete(r.loading, resolved)
+	if rerr != nil {
+		return rerr
+	}
+	if ret != nil {
+		return errAt(ret.pos, "return outside function")
+	}
+
+	mod := &Module{Name: moduleName(resolved), Exports: child.scopes[0]}
+	r.modCache[resolved] = mod
+	return r.bindModule(s, mod)
+}
+
+func (r *Runtime) bindModule(s *ast.ImportStmt, mod *Module) *Error {
+	if s.Alias != "" {
+		r.scopes[len(r.scopes)-1][s.Alias] = mod
+		return nil
+	}
+	for k, v := range mod.Exports { // source-style merge; last write wins
+		r.scopes[0][k] = v
+	}
+	return nil
+}
+
+func moduleName(path string) string {
+	base := filepath.Base(path)
+	if ext := filepath.Ext(base); ext != "" {
+		return strings.TrimSuffix(base, ext)
+	}
+	return base
+}
+
 // outputWriter adapts the Output sink to io.Writer for command streams.
 type outputWriter struct{ o Output }
 
@@ -348,9 +456,37 @@ func (r *Runtime) runCommand(pos ast.Pos, name string, args []string) (int, *Err
 	return code, nil
 }
 
+// resolveDotted evaluates `alias.name` against an imported module.
+func (r *Runtime) resolveDotted(n *ast.Ident) (Value, *Error) {
+	parts := strings.SplitN(n.Name, ".", 2)
+	base, ok := r.lookup(parts[0])
+	if !ok {
+		return nil, errAt(n.Pos, "undefined variable: %s", parts[0])
+	}
+	mod, isMod := base.(*Module)
+	if !isMod {
+		return nil, errAt(n.Pos, "%s is not a module — dotted access needs an import alias", parts[0])
+	}
+	v, exists := mod.Exports[parts[1]]
+	if !exists {
+		return nil, errAt(n.Pos, "module %s has no %s", mod.Name, parts[1])
+	}
+	return v, nil
+}
+
 // call evaluates a function or builtin invocation.
 func (r *Runtime) call(n *ast.CallExpr) (Value, *Error) {
-	fnVal, ok := r.lookup(n.Name)
+	var fnVal Value
+	var ok bool
+	if strings.Contains(n.Name, ".") {
+		v, err := r.resolveDotted(&ast.Ident{Pos: n.Pos, Name: n.Name})
+		if err != nil {
+			return nil, err
+		}
+		fnVal, ok = v, true
+	} else {
+		fnVal, ok = r.lookup(n.Name)
+	}
 	if !ok {
 		return nil, errAt(n.Pos, "undefined function: %s", n.Name)
 	}
@@ -387,9 +523,11 @@ func (r *Runtime) callFunc(n *ast.CallExpr, f *Func, args []Value) (Value, *Erro
 	for i, v := range args {
 		scope[f.Params[i]] = v
 	}
-	r.scopes = append(r.scopes, scope)
+	// Execute in the function's defining environment + one call scope.
+	saved := r.scopes
+	r.scopes = append(append([]map[string]Value{}, f.env...), scope)
 	ret, err := r.execBlock(f.Body)
-	r.scopes = r.scopes[:len(r.scopes)-1]
+	r.scopes = saved
 	if err != nil {
 		return nil, err
 	}
