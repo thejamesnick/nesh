@@ -41,6 +41,27 @@ type Float float64
 type Str string
 type Bool bool
 
+// List is an ordered collection of values, produced by builtins like split.
+type List []Value
+
+func (l List) String() string {
+	parts := make([]string, len(l))
+	for i, v := range l {
+		parts[i] = v.String()
+	}
+	return "[" + strings.Join(parts, ", ") + "]"
+}
+
+// Builtin is a native function registered from Go. Fn receives already
+// evaluated arguments and may return a plain error; the runtime wraps it
+// with the call site's position.
+type Builtin struct {
+	Name string
+	Fn   func(args []Value) (Value, error)
+}
+
+func (b *Builtin) String() string { return "<builtin " + b.Name + ">" }
+
 // Func is a user-defined function. Functions live in the global scope.
 type Func struct {
 	Name   string
@@ -95,6 +116,11 @@ func New(out Output) *Runtime {
 
 // SetRunner enables system commands (`git status`, `run ...`).
 func (r *Runtime) SetRunner(runner shell.CommandRunner) { r.runner = runner }
+
+// Define installs a builtin function in the global scope.
+func (r *Runtime) Define(name string, fn func(args []Value) (Value, error)) {
+	r.scopes[0][name] = &Builtin{Name: name, Fn: fn}
+}
 
 // Event is one structured execution step for the agent API (nesh --json).
 type Event struct {
@@ -208,6 +234,26 @@ func (r *Runtime) execStmt(stmt ast.Stmt) (*returnValue, *Error) {
 				return ret, err
 			}
 		}
+	case *ast.ForStmt:
+		it, err := r.eval(s.Iter)
+		if err != nil {
+			return nil, err
+		}
+		list, ok := it.(List)
+		if !ok {
+			return nil, errAt(s.Pos, "cannot iterate %s — for-in needs a list", it)
+		}
+		// The loop variable binds in the CURRENT scope (same rule as
+		// `let`), so accumulators work exactly like in `while`.
+		cur := len(r.scopes) - 1
+		r.scopes[cur][s.Var] = Bool(false)
+		for _, item := range list {
+			r.scopes[cur][s.Var] = item
+			if ret, err := r.execBlock(s.Body); ret != nil || err != nil {
+				return ret, err
+			}
+		}
+		return nil, nil
 	case *ast.CmdStmt:
 		_, err := r.runCommand(s.Pos, s.Name, s.Args)
 		return nil, err
@@ -302,25 +348,43 @@ func (r *Runtime) runCommand(pos ast.Pos, name string, args []string) (int, *Err
 	return code, nil
 }
 
-// call evaluates a function call: args bind as locals in a fresh scope.
+// call evaluates a function or builtin invocation.
 func (r *Runtime) call(n *ast.CallExpr) (Value, *Error) {
 	fnVal, ok := r.lookup(n.Name)
 	if !ok {
 		return nil, errAt(n.Pos, "undefined function: %s", n.Name)
 	}
-	f, ok := fnVal.(*Func)
-	if !ok {
-		return nil, errAt(n.Pos, "%s is not a function (it is %s)", n.Name, fnVal)
-	}
-	if len(n.Args) != len(f.Params) {
-		return nil, errAt(n.Pos, "%s expects %d argument(s), got %d", f.Name, len(f.Params), len(n.Args))
-	}
-	scope := make(map[string]Value, len(f.Params))
+
+	args := make([]Value, len(n.Args)) // args evaluated in the caller's scope
 	for i, argExpr := range n.Args {
-		v, err := r.eval(argExpr) // args evaluated in the caller's scope
+		v, err := r.eval(argExpr)
 		if err != nil {
 			return nil, err
 		}
+		args[i] = v
+	}
+
+	switch f := fnVal.(type) {
+	case *Builtin:
+		res, ferr := f.Fn(args)
+		if ferr != nil {
+			return nil, errAt(n.Pos, "%s: %v", f.Name, ferr)
+		}
+		return res, nil
+	case *Func:
+		return r.callFunc(n, f, args)
+	default:
+		return nil, errAt(n.Pos, "%s is not a function (it is %s)", n.Name, fnVal)
+	}
+}
+
+// callFunc runs a user-defined function: args bind as locals in a fresh scope.
+func (r *Runtime) callFunc(n *ast.CallExpr, f *Func, args []Value) (Value, *Error) {
+	if len(args) != len(f.Params) {
+		return nil, errAt(n.Pos, "%s expects %d argument(s), got %d", f.Name, len(f.Params), len(args))
+	}
+	scope := make(map[string]Value, len(f.Params))
+	for i, v := range args {
 		scope[f.Params[i]] = v
 	}
 	r.scopes = append(r.scopes, scope)

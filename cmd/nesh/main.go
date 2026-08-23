@@ -13,6 +13,7 @@ import (
 	"os"
 
 	"nesh/internal/ast"
+	"nesh/internal/builtin"
 	"nesh/internal/parser"
 	"nesh/internal/runtime"
 	"nesh/internal/shell"
@@ -120,6 +121,7 @@ func runWithEvents(src string) (*ast.Script, []runtime.Event, *parser.Error, *ru
 	var events []runtime.Event
 	rt := runtime.New(bufio.NewWriter(io.Discard))
 	rt.SetRunner(shell.RealRunner{})
+	builtin.RegisterAll(rt, shell.RealFS{})
 	rt.SetEventSink(func(e runtime.Event) { events = append(events, e) })
 	rerr := rt.Run(script)
 	return script, events, nil, rerr
@@ -157,6 +159,7 @@ func execSource(src string) int {
 	out := bufio.NewWriter(os.Stdout)
 	rt := runtime.New(out)
 	rt.SetRunner(shell.RealRunner{})
+	builtin.RegisterAll(rt, shell.RealFS{})
 	if rerr := rt.Run(script); rerr != nil {
 		out.Flush()
 		fmt.Fprintf(os.Stderr, "error: %v\n", rerr)
@@ -190,6 +193,7 @@ func repl(in *os.File, outFile *os.File) int {
 
 	rt := runtime.New(w)
 	rt.SetRunner(shell.RealRunner{})
+	builtin.RegisterAll(rt, shell.RealFS{})
 	for {
 		line, err := rl.ReadLine("nesh> ")
 		if err == io.EOF || line == "exit" && err == nil {

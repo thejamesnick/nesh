@@ -428,6 +428,69 @@ func TestWhileLoop(t *testing.T) {
 	}
 }
 
+func TestForIn(t *testing.T) {
+	out := &fakeOutput{}
+	rt := New(out)
+	rt.Define("range", func(args []Value) (Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("expects 1 argument, got %d", len(args))
+		}
+		n, ok := args[0].(Int)
+		if !ok {
+			return nil, fmt.Errorf("needs an int, got %s", args[0])
+		}
+		list := make(List, n)
+		for i := range list {
+			list[i] = Int(i + 1)
+		}
+		return list, nil
+	})
+
+	rt.SetRunner(&fakeRunner{})
+	rt.SetEventSink(nil)
+	rt.Define("split", func(args []Value) (Value, error) {
+		s, ok := args[0].(Str)
+		if !ok || len(args) != 2 {
+			return nil, fmt.Errorf("bad args")
+		}
+		sep, _ := args[1].(Str)
+		parts := strings.Split(string(s), string(sep))
+		list := make(List, len(parts))
+		for i, p := range parts {
+			list[i] = Str(p)
+		}
+		return list, nil
+	})
+
+	script, perr := parser.Parse("let total = 0\nfor x in range(4)\nlet total = total + x\nend\nprint total\nfor w in split(\"go go go\", \" \")\nprint w\nend\n")
+	if perr != nil {
+		t.Fatal(perr)
+	}
+	rt.SetEventSink(nil)
+	if err := rt.Run(script); err != nil {
+		t.Fatal(err)
+	}
+	want := "10\ngo\ngo\ngo\n"
+	if out.b.String() != want {
+		t.Fatalf("got %q, want %q", out.b.String(), want)
+	}
+
+	// iterating a non-list is an error
+	bad, _ := parser.Parse("for x in 5\nprint x\nend\n")
+	if err := rt.Run(bad); err == nil || !strings.Contains(err.Error(), "cannot iterate 5") {
+		t.Fatalf("expected iterate error, got %v", err)
+	}
+
+	// loop variable binds in the surrounding scope (like `let`)
+	scoped, _ := parser.Parse("for y in split(\"a\", \" \")\nprint y\nend\nprint y\n")
+	if err := rt.Run(scoped); err != nil {
+		t.Fatal(err)
+	}
+	if out.b.String() != "10\ngo\ngo\ngo\na\na\n" {
+		t.Fatalf("loop var scoping wrong: %q", out.b.String())
+	}
+}
+
 func TestWhitespaceTolerance(t *testing.T) {
 	// Indentation is optional style; blocks are closed by keywords.
 	// Tabs, multiple spaces, missing spaces before strings, blank lines,

@@ -187,6 +187,43 @@ deploy("prod")           # call as statement (side effects)
 Arity is strict: calling with the wrong number of arguments is a runtime
 error at the call site.
 
+## 4.7 Standard Library
+
+Builtins are called like functions and live in the global scope (user
+code may shadow them with `let`).
+
+Strings & lists:
+```
+len("hello")            # 5 — strings by runes, lists by elements
+upper(s) lower(s)
+split("a,b", ",")       # list: ["a", "b"]
+join(list, "-")
+contains(s, sub)        # true/false
+```
+
+Math:
+```
+abs(-7)  floor(3.9)  round(2.5)   # ints
+min(a, b, ...) max(a, b, ...)
+```
+
+Files (OS access via the shell.FileSystem seam):
+```
+read("f.txt")           # string; runtime error if unreadable
+write("f.txt", data)    # true on success
+exists("f.txt")         # true/false
+```
+
+Lists & for-in:
+```
+let xs = split("a b c", " ")
+for x in xs
+  print x
+end
+```
+The loop variable binds in the surrounding scope (same rule as `let`),
+so accumulators behave exactly like in `while`.
+
 ---
 
 # 5. Execution Model

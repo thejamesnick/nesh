@@ -83,6 +83,14 @@ type WhileStmt struct {
 	Body []Stmt `json:"body"`
 }
 
+// ForStmt is `for x in <list-expr> ... end`.
+type ForStmt struct {
+	Pos  Pos    `json:"pos"`
+	Var  string `json:"var"`
+	Iter Expr   `json:"iter"`
+	Body []Stmt `json:"body"`
+}
+
 // CmdStmt is a bare system command: `git status --short`. Words are literal
 // (no variable expansion yet — Phase 3 decision).
 type CmdStmt struct {
@@ -165,6 +173,7 @@ func (s *FnStmt) Position() Pos     { return s.Pos }
 func (s *ReturnStmt) Position() Pos { return s.Pos }
 func (s *ExprStmt) Position() Pos   { return s.Expr.Position() }
 func (s *WhileStmt) Position() Pos  { return s.Pos }
+func (s *ForStmt) Position() Pos    { return s.Pos }
 func (s *CmdStmt) Position() Pos    { return s.Pos }
 func (e *RunExpr) Position() Pos    { return e.Pos }
 func (e *Ident) Position() Pos      { return e.Pos }
@@ -183,6 +192,7 @@ func (*FnStmt) stmtNode()     {}
 func (*ReturnStmt) stmtNode() {}
 func (*ExprStmt) stmtNode()   {}
 func (*WhileStmt) stmtNode()  {}
+func (*ForStmt) stmtNode()    {}
 func (*CmdStmt) stmtNode()    {}
 
 func (*Ident) exprNode()      {}

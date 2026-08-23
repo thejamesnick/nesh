@@ -8,8 +8,23 @@ package shell
 import (
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 )
+
+// FileSystem is the file-access seam (backs the read/write/exists builtins).
+type FileSystem interface {
+	ReadFile(path string) ([]byte, error)
+	WriteFile(path string, data []byte) error
+	Exists(path string) bool
+}
+
+// RealFS is the os-backed FileSystem implementation.
+type RealFS struct{}
+
+func (RealFS) ReadFile(path string) ([]byte, error)     { return os.ReadFile(path) }
+func (RealFS) WriteFile(path string, data []byte) error { return os.WriteFile(path, data, 0o644) }
+func (RealFS) Exists(path string) bool                  { _, err := os.Stat(path); return err == nil }
 
 // CommandRunner spawns processes and captures exit codes.
 type CommandRunner interface {

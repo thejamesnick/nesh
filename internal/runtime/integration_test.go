@@ -20,6 +20,7 @@ func TestIntegrationScripts(t *testing.T) {
 		{"hello.nsh", "hello world\n4\n7\n9\n3\n"},
 		{"algorithms.nsh", "5! = 120\nfib(10) = 55\niterative: 120\n"},
 		{"health.nsh", "host web-01 healthy, load 0.75\nstatus: down\nnegated: false\n"},
+		// stdlib.nsh is exercised by internal/builtin's integration test
 	}
 	for _, c := range cases {
 		src, err := os.ReadFile(filepath.Join("..", "..", "testdata", c.file))

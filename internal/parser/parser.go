@@ -89,7 +89,7 @@ func OpenBlocks(src string) int {
 		switch t.Type {
 		case token.EOF:
 			return depth
-		case token.IF, token.FN, token.WHILE:
+		case token.IF, token.FN, token.WHILE, token.FOR:
 			depth++
 		case token.END:
 			depth--
@@ -122,6 +122,8 @@ func (p *parser) parseStmt() (ast.Stmt, bool) {
 		return p.parseFn()
 	case token.WHILE:
 		return p.parseWhile()
+	case token.FOR:
+		return p.parseFor()
 	case token.RETURN:
 		return p.parseReturn()
 	case token.IDENT:
@@ -265,6 +267,32 @@ func (p *parser) parseWhile() (ast.Stmt, bool) {
 		return nil, false
 	}
 	return &ast.WhileStmt{Pos: pos, Cond: cond, Body: body}, true
+}
+
+func (p *parser) parseFor() (ast.Stmt, bool) {
+	pos := ast.Pos{Line: p.cur.Line, Column: p.cur.Column}
+	p.next() // consume 'for'
+	if !p.at(token.IDENT) {
+		p.fail("expected loop variable after for, got %q", p.cur.Literal)
+		return nil, false
+	}
+	varName := p.cur.Literal
+	p.next()
+	if !p.expect(token.IN) {
+		return nil, false
+	}
+	iter, ok := p.parseExpr(precLowest)
+	if !ok {
+		return nil, false
+	}
+	body, ok := p.parseBlock(token.END)
+	if !ok {
+		return nil, false
+	}
+	if !p.expect(token.END) {
+		return nil, false
+	}
+	return &ast.ForStmt{Pos: pos, Var: varName, Iter: iter, Body: body}, true
 }
 
 func (p *parser) parseReturn() (ast.Stmt, bool) {
