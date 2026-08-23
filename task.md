@@ -82,7 +82,7 @@ a task isn't "done" until its test box is checked, and every phase ends with PLA
 - [x] T3.2 REPL: history, line editing (raw mode), multi-line blocks via parser.OpenBlocks
 - [x] T3.3 `nesh --json script.nsh`: JSON AST (kind-tagged nodes) + structured execution events {status, ast, events, errors}
 - [x] T3.4 Stdlib via `internal/builtin` plugins: len/upper/lower/split/join/contains, abs/floor/round/min/max, read/write/exists (FileSystem seam); List values + `for x in` shipped alongside
-- [ ] T3.5 Modules: `import "utils.nsh"` — simple, file-based
+- [x] T3.5 Modules: `import "x.nsh"` (merge) and `import "x.nsh" as u` (namespaced, dotted access); cached by path, cycle detection; real lexical scoping (Func captures defining env)
 - [ ] T3.6 Memory/GC benchmark pass, docs, tag `v0.3.0`
 
 ---
