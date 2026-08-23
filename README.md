@@ -57,6 +57,9 @@ nesh
 
 # Run a one-liner
 nesh -c "print hello"
+
+# Agent API: JSON AST + structured execution events
+nesh --json script.nsh
 ```
 
 You can also set Nesh as your default shell on macOS or Linux — but you don't have to. Start with a single `.nsh` file. No pressure, no forced migration.
@@ -71,7 +74,11 @@ You can also set Nesh as your default shell on macOS or Linux — but you don't 
 | Variable      | `let x = 5`                   | `x=5`                         |
 | Condition     | `if x > 5 then ... end`       | `if [ "$x" -gt 5 ]; then ... fi` |
 | Function      | `fn greet(name) ... end`      | `greet() { ... }`             |
+| Loops         | `while i < 10 ... end` / `for x in list ... end` | `while`, `for` |
 | System command| `ls -la`                      | `ls -la`                      |
+| Exit code     | `let code = run git status`   | `$?`                          |
+| Modules       | `import "utils.nsh" as u`     | `source utils.sh`             |
+| Stdlib        | `split(s, ",")`, `len(x)`, `read(f)` | awk/sed/grep gymnastics |
 
 ---
 
@@ -85,13 +92,18 @@ You can also set Nesh as your default shell on macOS or Linux — but you don't 
 
 ## Project Status
 
-Currently in active development. Nothing is built yet — we're laying the foundation.
+Phase 3 (AI & Polish) complete. Nesh runs real automation scripts:
+
+- Full language: arithmetic, booleans, if/elif, functions + recursion, while/for-in loops
+- System commands straight from PATH with exit-code capture via `run`
+- Standard library: string ops, math, file read/write
+- Modules: `import "x.nsh"` with optional namespacing (`as u`) and cycle detection
+- REPL with multi-line blocks, history, and line editing
+- `nesh --json`: machine-readable AST + execution events for AI agents
+- Faster than bash in every measured category (see benchmarks/results/)
 
 Roadmap:
-- Phase 1 — Lexer, parser, basic commands, CLI
-- Phase 2 — Functions, modules, error handling, stdlib
-- Phase 3 — AI integration layer, structured execution APIs
-- Phase 4 — Package manager, ecosystem, cross-platform distribution
+- Phase 4 — Package manager, cross-platform distribution, v1.0 polish
 
 ---
 

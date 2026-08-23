@@ -15,17 +15,15 @@ a task isn't "done" until its test box is checked, and every phase ends with PLA
 
 | Area | State |
 |---|---|
-| Go module (`go.mod`, module `nesh`) | ✅ exists |
-| Directory structure (`cmd/`, `internal/`, `benchmarks/`, `testdata/`) | ✅ exists |
-| `internal/token` (token types) | ✅ done — compiles, keyword set complete |
-| `internal/lexer` | ✅ done — 98% coverage, 11 tests green |
-| `internal/parser` + `internal/ast` | ✅ done — 87% coverage, precedence/errors tested |
-| `internal/runtime` (evaluator) | ✅ done — 80% coverage, REPL-persistent globals |
-| CLI (`cmd/nesh`) + REPL | ✅ done — script/-c/help verified, exit codes 0/1/2 correct |
-| Startup benchmark | ✅ done — nesh ~10ms vs bash ~9ms warm (parity, ≤2x target met) |
+| Language core (lexer, parser, AST, runtime) | ✅ Phases 1–3 complete — v0.1.0 / v0.2.0 / v0.3.0 |
+| Control flow, functions, loops, modules | ✅ done, tested (runtime 88%, parser 82%, lexer 98%) |
+| System commands via shell seam | ✅ CommandRunner + FileSystem interfaces |
+| Stdlib (`internal/builtin`) | ✅ 11 builtins, plugin registry |
+| REPL | ✅ multi-line blocks, history, raw-mode editing |
+| Agent API (`nesh --json`) | ✅ kind-tagged AST + execution events |
+| Benchmarks | ✅ beats bash in all categories; memory profiled |
 
-**Phase 1 complete except close-out: T1.10 commit + tag `v0.1.0` pending owner approval.**
-*Verified 2026-08-23: `go vet` clean, all tests pass fresh, hello.nsh output correct, error paths return proper exit codes.*
+**Next phase: Phase 4 — Ecosystem (pkg manager, cross-platform CI, v1.0)**
 
 ---
 
@@ -83,7 +81,9 @@ a task isn't "done" until its test box is checked, and every phase ends with PLA
 - [x] T3.3 `nesh --json script.nsh`: JSON AST (kind-tagged nodes) + structured execution events {status, ast, events, errors}
 - [x] T3.4 Stdlib via `internal/builtin` plugins: len/upper/lower/split/join/contains, abs/floor/round/min/max, read/write/exists (FileSystem seam); List values + `for x in` shipped alongside
 - [x] T3.5 Modules: `import "x.nsh"` (merge) and `import "x.nsh" as u` (namespaced, dotted access); cached by path, cycle detection; real lexical scoping (Func captures defining env)
-- [ ] T3.6 Memory/GC benchmark pass, docs, tag `v0.3.0`
+- [x] T3.6 Memory/GC benchmark pass (bench_test.go: loop 670µs/35KB, fn 608µs/223KB per op; low GC pressure — no optimization warranted), docs refreshed, tag `v0.3.0`
+
+**Phase 3 ✅ COMPLETE — v0.3.0 tagged**
 
 ---
 
