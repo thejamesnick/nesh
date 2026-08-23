@@ -8,6 +8,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 
 	"nesh/internal/parser"
@@ -81,32 +82,71 @@ func execSource(src string) int {
 	return 0
 }
 
-// repl reads lines, evaluates each in a shared runtime (globals persist),
-// and keeps going after errors. History/editing arrive in Phase 3.
+// repl reads lines (or whole blocks, once a block keyword opens), evaluates
+// each in a shared runtime (globals persist), and keeps going after errors.
 func repl(in *os.File, outFile *os.File) int {
 	w := bufio.NewWriter(outFile)
 	defer w.Flush()
 	interactive := isTerminal(in)
 	if interactive {
 		fmt.Fprintf(w, "Nesh %s\n", version)
+		w.Flush()
 	}
+
+	var rl lineReader = newPlainReader(in)
+	if interactive {
+		raw, err := newRawLineReader(in, outFile)
+		if err == nil {
+			rl = raw
+			defer rl.Close()
+		} else {
+			fmt.Fprintf(os.Stderr, "nesh: raw mode unavailable (%v); falling back to plain input\n", err)
+		}
+	}
+
 	rt := runtime.New(w)
 	rt.SetRunner(shell.RealRunner{})
-	sc := bufio.NewScanner(in)
 	for {
-		if interactive {
-			fmt.Fprint(w, "nesh> ")
-			w.Flush()
-		}
-		if !sc.Scan() {
-			fmt.Fprintln(w)
+		line, err := rl.ReadLine("nesh> ")
+		if err == io.EOF || line == "exit" && err == nil {
 			return 0
 		}
-		line := sc.Text()
-		if line == "exit" {
+		if err == errInterrupt {
+			continue
+		}
+		if err != nil {
+			fmt.Fprintf(w, "nesh: %v\n", err)
+			return 1
+		}
+		if line == "" {
+			continue
+		}
+
+		// Collect continuation lines until every if/fn/while block closes.
+		buf := line
+		for parser.OpenBlocks(buf) > 0 {
+			more, err := rl.ReadLine("....> ")
+			if err == io.EOF {
+				return 0
+			}
+			if err == errInterrupt {
+				buf = ""
+				break
+			}
+			if err != nil {
+				fmt.Fprintf(w, "nesh: %v\n", err)
+				return 1
+			}
+			buf += "\n" + more
+		}
+		if buf == "" {
+			continue
+		}
+		if buf == "exit" {
 			return 0
 		}
-		script, perr := parser.Parse(line)
+
+		script, perr := parser.Parse(buf)
 		if perr != nil {
 			fmt.Fprintf(w, "parse error: %v\n", perr)
 			w.Flush()

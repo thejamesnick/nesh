@@ -88,6 +88,25 @@ func TestCommandPhrases(t *testing.T) {
 	}
 }
 
+func TestOpenBlocks(t *testing.T) {
+	cases := []struct {
+		src  string
+		want int
+	}{
+		{"let x = 1\n", 0},
+		{"if true then print 1 end\n", 0},
+		{"if x > 1 then\n", 1},
+		{"fn f()\n", 1},
+		{"while x\nif y then\n", 2},
+		{"# if then end inside a comment\nlet s = \"if fake then\"\n", 0},
+	}
+	for _, c := range cases {
+		if got := OpenBlocks(c.src); got != c.want {
+			t.Errorf("OpenBlocks(%q) = %d, want %d", c.src, got, c.want)
+		}
+	}
+}
+
 func TestCommandErrors(t *testing.T) {
 	cases := []struct{ src, want string }{
 		{"run\n", `1:4: expected command name after run, got "\n"`},

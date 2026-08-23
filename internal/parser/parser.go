@@ -79,6 +79,24 @@ func Parse(src string) (*ast.Script, *Error) {
 	return s, nil
 }
 
+// OpenBlocks reports how many if/fn/while blocks are still open at the
+// end of src. The REPL uses it to decide whether to keep reading lines.
+func OpenBlocks(src string) int {
+	l := lexer.New(src)
+	depth := 0
+	for {
+		t := l.NextToken()
+		switch t.Type {
+		case token.EOF:
+			return depth
+		case token.IF, token.FN, token.WHILE:
+			depth++
+		case token.END:
+			depth--
+		}
+	}
+}
+
 func (p *parser) next() {
 	p.cur = p.peek
 	p.peek = p.l.NextToken()
