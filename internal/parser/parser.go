@@ -26,8 +26,11 @@ func (e *Error) Error() string {
 // precedence levels; higher binds tighter.
 const (
 	precLowest  = 0
-	precSum     = 1 // + -
-	precProduct = 2 // * /
+	precOr      = 1 // or
+	precAnd     = 2 // and
+	precCompare = 3 // == != < > <= >=
+	precSum     = 4 // + -
+	precProduct = 5 // * /
 )
 
 var precedences = map[token.Type]int{
@@ -35,6 +38,14 @@ var precedences = map[token.Type]int{
 	token.MINUS:    precSum,
 	token.ASTERISK: precProduct,
 	token.SLASH:    precProduct,
+	token.EQ:       precCompare,
+	token.NOT_EQ:   precCompare,
+	token.LT:       precCompare,
+	token.GT:       precCompare,
+	token.LTE:      precCompare,
+	token.GTE:      precCompare,
+	token.AND:      precAnd,
+	token.OR:       precOr,
 }
 
 type parser struct {
@@ -163,14 +174,15 @@ func (p *parser) parseExpr(minPrec int) (ast.Expr, bool) {
 }
 
 func (p *parser) parseUnary() (ast.Expr, bool) {
-	if p.at(token.MINUS) {
+	if p.at(token.MINUS) || p.at(token.NOT) {
 		pos := ast.Pos{Line: p.cur.Line, Column: p.cur.Column}
+		op := p.cur.Literal
 		p.next()
 		right, ok := p.parseUnary()
 		if !ok {
 			return nil, false
 		}
-		return &ast.PrefixExpr{Pos: pos, Op: "-", Right: right}, true
+		return &ast.PrefixExpr{Pos: pos, Op: op, Right: right}, true
 	}
 	return p.parsePrimary()
 }
@@ -202,6 +214,10 @@ func (p *parser) parsePrimary() (ast.Expr, bool) {
 		v := p.cur.Literal
 		p.next()
 		return &ast.StringLit{Pos: pos, Value: v}, true
+	case token.TRUE, token.FALSE:
+		v := p.cur.Type == token.TRUE
+		p.next()
+		return &ast.BoolLit{Pos: pos, Value: v}, true
 	case token.LPAREN:
 		p.next()
 		inner, ok := p.parseExpr(precLowest)

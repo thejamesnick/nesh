@@ -51,7 +51,9 @@ a task isn't "done" until its test box is checked, and every phase ends with PLA
   - DW: all forms verified from built binary
 - [x] T1.9 Minimal REPL: banner, `nesh>` prompt, globals persist, errors don't kill session, `exit` quits
   - DW: verified via piped session (history/editing = Phase 3 per plan)
-- [~] T1.10 Phase 1 close-out: startup benchmark done (nesh ~10ms vs bash ~9ms warm — parity, ≤2x target met); task.md updated; **commit + tag `v0.1.0` pending owner approval**`
+- [x] T1.10 Phase 1 close-out: startup benchmark done (nesh ~10ms vs bash ~9ms warm — parity, ≤2x target met); REPL prompt hidden for piped stdin; committed + tagged `v0.1.0` (2026-08-23)
+
+**Phase 1 ✅ COMPLETE — v0.1.0 tagged**
 
 ---
 
@@ -59,7 +61,7 @@ a task isn't "done" until its test box is checked, and every phase ends with PLA
 
 **DW: scripts with if/else, fn definitions/calls (incl. simple recursion), and PATH commands run correctly.**
 
-- [ ] T2.1 Comparison + boolean operators (`== != < > <= >= and or not`), truthiness rules written into spec
+- [~] T2.1 Comparison + boolean operators (`== != < > <= >= and or not`), truthiness rules written into spec
 - [ ] T2.2 `if cond then ... else ... end` execution (+ `elif`? decide and document)
 - [ ] T2.3 `fn name(params) ... end` with `return`; lexical scoping decision (dynamic vs lexical — document!)
 - [ ] T2.4 Function calls as expressions; recursion works

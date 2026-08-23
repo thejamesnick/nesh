@@ -45,6 +45,11 @@ const (
 	FOR    Type = "for"
 	IN     Type = "in"
 	WHILE  Type = "while"
+	AND    Type = "and"
+	OR     Type = "or"
+	NOT    Type = "not"
+	TRUE   Type = "true"
+	FALSE  Type = "false"
 )
 
 var keywords = map[string]Type{
@@ -59,6 +64,11 @@ var keywords = map[string]Type{
 	"for":    FOR,
 	"in":     IN,
 	"while":  WHILE,
+	"and":    AND,
+	"or":     OR,
+	"not":    NOT,
+	"true":   TRUE,
+	"false":  FALSE,
 }
 
 // LookupIdent returns the keyword type for ident, or IDENT if it is not a keyword.

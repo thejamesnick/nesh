@@ -69,6 +69,12 @@ type StringLit struct {
 	Value string
 }
 
+// BoolLit is `true` or `false`.
+type BoolLit struct {
+	Pos   Pos
+	Value bool
+}
+
 // PrefixExpr is a unary operation (currently: negation).
 type PrefixExpr struct {
 	Pos   Pos
@@ -96,6 +102,7 @@ func (e *Ident) Position() Pos      { return e.Pos }
 func (e *IntLit) Position() Pos     { return e.Pos }
 func (e *FloatLit) Position() Pos   { return e.Pos }
 func (e *StringLit) Position() Pos  { return e.Pos }
+func (e *BoolLit) Position() Pos    { return e.Pos }
 func (e *PrefixExpr) Position() Pos { return e.Pos }
 func (e *InfixExpr) Position() Pos  { return e.Pos }
 
@@ -106,5 +113,6 @@ func (*Ident) exprNode()      {}
 func (*IntLit) exprNode()     {}
 func (*FloatLit) exprNode()   {}
 func (*StringLit) exprNode()  {}
+func (*BoolLit) exprNode()    {}
 func (*PrefixExpr) exprNode() {}
 func (*InfixExpr) exprNode()  {}

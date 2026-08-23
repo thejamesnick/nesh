@@ -6,6 +6,7 @@
 package runtime
 
 import (
+	"cmp"
 	"fmt"
 	"strconv"
 	"strings"
@@ -33,14 +34,39 @@ type Value interface {
 	String() string
 }
 
-// Int, Float, Str are the Phase 1 value types.
+// Int, Float, Str, Bool are the Phase 1–2 value types.
 type Int int64
 type Float float64
 type Str string
+type Bool bool
 
 func (v Int) String() string   { return strconv.FormatInt(int64(v), 10) }
 func (v Float) String() string { return strconv.FormatFloat(float64(v), 'g', -1, 64) }
 func (v Str) String() string   { return string(v) }
+func (v Bool) String() string {
+	if v {
+		return "true"
+	}
+	return "false"
+}
+
+// Truthy reports the Nesh truthiness of a value:
+// false for Bool(false), Int(0), Float(0.0), Str(""); true otherwise.
+// This is the documented rule (TECHNICAL_SPEC.md — Truthiness).
+func Truthy(v Value) bool {
+	switch x := v.(type) {
+	case Bool:
+		return bool(x)
+	case Int:
+		return x != 0
+	case Float:
+		return x != 0
+	case Str:
+		return x != ""
+	default:
+		return true
+	}
+}
 
 // Runtime executes scripts against a persistent scope (globals survive
 // across Run calls, which is what the REPL needs).
@@ -103,6 +129,8 @@ func (r *Runtime) eval(e ast.Expr) (Value, *Error) {
 		return Float(n.Value), nil
 	case *ast.StringLit:
 		return Str(n.Value), nil
+	case *ast.BoolLit:
+		return Bool(n.Value), nil
 	case *ast.Ident:
 		if v, ok := r.globals[n.Name]; ok {
 			return v, nil
@@ -113,13 +141,20 @@ func (r *Runtime) eval(e ast.Expr) (Value, *Error) {
 		if err != nil {
 			return nil, err
 		}
-		switch x := v.(type) {
-		case Int:
-			return -x, nil
-		case Float:
-			return -x, nil
+		switch n.Op {
+		case "-":
+			switch x := v.(type) {
+			case Int:
+				return -x, nil
+			case Float:
+				return -x, nil
+			default:
+				return nil, errAt(n.Pos, "cannot negate %s", v)
+			}
+		case "not":
+			return Bool(!Truthy(v)), nil
 		default:
-			return nil, errAt(n.Pos, "cannot negate %s", v)
+			return nil, errAt(n.Pos, "unknown unary operator %q", n.Op)
 		}
 	case *ast.InfixExpr:
 		return r.evalInfix(n)
@@ -129,6 +164,26 @@ func (r *Runtime) eval(e ast.Expr) (Value, *Error) {
 }
 
 func (r *Runtime) evalInfix(n *ast.InfixExpr) (Value, *Error) {
+	// and/or short-circuit: the right side may have side effects later
+	// (function calls), so it must not run when the left decides.
+	if n.Op == "and" || n.Op == "or" {
+		l, err := r.eval(n.L)
+		if err != nil {
+			return nil, err
+		}
+		if n.Op == "and" && !Truthy(l) {
+			return Bool(false), nil
+		}
+		if n.Op == "or" && Truthy(l) {
+			return Bool(true), nil
+		}
+		rr, err := r.eval(n.R)
+		if err != nil {
+			return nil, err
+		}
+		return Bool(Truthy(rr)), nil
+	}
+
 	l, err := r.eval(n.L)
 	if err != nil {
 		return nil, err
@@ -136,6 +191,13 @@ func (r *Runtime) evalInfix(n *ast.InfixExpr) (Value, *Error) {
 	rr, err := r.eval(n.R)
 	if err != nil {
 		return nil, err
+	}
+
+	// Comparisons: == and != accept any two values of the same type;
+	// < > <= >= accept two numbers or two strings.
+	switch n.Op {
+	case "==", "!=", "<", ">", "<=", ">=":
+		return compare(n, l, rr)
 	}
 
 	// Strings: concatenation only, with strings — no silent coercion.
@@ -197,6 +259,54 @@ func floatInfix(n *ast.InfixExpr, x, y Float) (Value, *Error) {
 		return x / y, nil
 	}
 	return nil, errAt(n.Pos, "unknown operator %q", n.Op)
+}
+
+// compare applies a comparison operator, promoting Int to Float when mixed.
+func compare(n *ast.InfixExpr, l, rr Value) (Value, *Error) {
+	switch x := l.(type) {
+	case Int:
+		switch y := rr.(type) {
+		case Int:
+			return boolResult(n.Op, int64(x), int64(y)), nil
+		case Float:
+			return boolResult(n.Op, float64(x), float64(y)), nil
+		}
+	case Float:
+		switch y := rr.(type) {
+		case Int:
+			return boolResult(n.Op, float64(x), float64(y)), nil
+		case Float:
+			return boolResult(n.Op, float64(x), float64(y)), nil
+		}
+	case Str:
+		if y, ok := rr.(Str); ok {
+			return boolResult(n.Op, string(x), string(y)), nil
+		}
+	case Bool:
+		if y, ok := rr.(Bool); ok && (n.Op == "==" || n.Op == "!=") {
+			return Bool(bool(n.Op == "==") == (x == y)), nil
+		}
+	}
+	return nil, errAt(n.Pos, "cannot compare %s and %s with %q", l, rr, n.Op)
+}
+
+func boolResult[T cmp.Ordered](op string, a, b T) Value {
+	var res bool
+	switch op {
+	case "==":
+		res = a == b
+	case "!=":
+		res = a != b
+	case "<":
+		res = a < b
+	case ">":
+		res = a > b
+	case "<=":
+		res = a <= b
+	case ">=":
+		res = a >= b
+	}
+	return Bool(res)
 }
 
 func errAt(p ast.Pos, format string, args ...any) *Error {

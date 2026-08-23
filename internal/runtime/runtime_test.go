@@ -113,3 +113,102 @@ func TestBarePrint(t *testing.T) {
 		t.Fatalf("bare print should emit one empty line; got %q, %v", out, err)
 	}
 }
+
+func TestComparisons(t *testing.T) {
+	cases := []struct{ src, want string }{
+		// numbers, incl. int/float promotion
+		{"print 1 == 1\n", "true\n"},
+		{"print 1 == 2\n", "false\n"},
+		{"print 1 != 2\n", "true\n"},
+		{"print 2 > 1\n", "true\n"},
+		{"print 2 < 1\n", "false\n"},
+		{"print 3 >= 3\n", "true\n"},
+		{"print 3 <= 2\n", "false\n"},
+		{"print 1 < 1.5\n", "true\n"}, // int promoted to float
+		// strings
+		{"print \"a\" == \"a\"\n", "true\n"},
+		{"print \"a\" != \"b\"\n", "true\n"},
+		{"print \"apple\" < \"banana\"\n", "true\n"},
+		// booleans
+		{"print (1 < 2) == true\n", "true\n"},
+		// precedence: comparison binds looser than arithmetic
+		{"print 1 + 2 == 3\n", "true\n"},
+		{"print 2 * 3 >= 5 + 1\n", "true\n"},
+	}
+	for _, c := range cases {
+		out, err := run(t, c.src)
+		if err != nil {
+			t.Errorf("%q: unexpected error %v", c.src, err)
+			continue
+		}
+		if out != c.want {
+			t.Errorf("%q: got %q, want %q", c.src, out, c.want)
+		}
+	}
+}
+
+func TestBooleanOperators(t *testing.T) {
+	cases := []struct{ src, want string }{
+		{"print true and false\n", "false\n"},
+		{"print true and true\n", "true\n"},
+		{"print false or true\n", "true\n"},
+		{"print not true\n", "false\n"},
+		{"print not 0\n", "true\n"}, // truthiness: 0 is false
+		{"print not \"\"\n", "true\n"},
+		// and binds tighter than or
+		{"print true or false and false\n", "true\n"},
+		{"print (true or false) and false\n", "false\n"},
+		// comparisons feed straight into boolean ops
+		{"let x = 10\nprint x > 5 and x < 20\n", "true\n"},
+		{"let x = 10\nprint x == 10 or x == 99\n", "true\n"},
+	}
+	for _, c := range cases {
+		out, err := run(t, c.src)
+		if err != nil {
+			t.Errorf("%q: unexpected error %v", c.src, err)
+			continue
+		}
+		if out != c.want {
+			t.Errorf("%q: got %q, want %q", c.src, out, c.want)
+		}
+	}
+}
+
+func TestTruthiness(t *testing.T) {
+	cases := []struct{ src, want string }{
+		{"print not 0\n", "true\n"},      // Int(0) falsy
+		{"print not 1\n", "false\n"},     // nonzero truthy
+		{"print not 0.0\n", "true\n"},    // Float(0.0) falsy
+		{"print not 0.5\n", "false\n"},   //
+		{"print not \"\"\n", "true\n"},   // empty string falsy
+		{"print not \"x\"\n", "false\n"}, // non-empty truthy
+	}
+	for _, c := range cases {
+		out, err := run(t, c.src)
+		if err != nil {
+			t.Errorf("%q: unexpected error %v", c.src, err)
+			continue
+		}
+		if out != c.want {
+			t.Errorf("%q: got %q, want %q", c.src, out, c.want)
+		}
+	}
+}
+
+func TestComparisonErrors(t *testing.T) {
+	cases := []struct{ src, want string }{
+		{"print 1 < \"a\"\n", `1:9: cannot compare 1 and a with "<"`},
+		{"print \"a\" + (1 == 1)\n", `1:11: cannot join string and true with "+"`},
+		{"print -\"x\"\n", `1:7: cannot negate x`},
+	}
+	for _, c := range cases {
+		_, err := run(t, c.src)
+		if err == nil {
+			t.Errorf("%q: expected error, got none", c.src)
+			continue
+		}
+		if err.Error() != c.want {
+			t.Errorf("%q: got %q, want %q", c.src, err.Error(), c.want)
+		}
+	}
+}

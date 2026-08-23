@@ -84,7 +84,37 @@ let name = "John"
 print name
 ```
 
-## 4.4 Control Flow
+## 4.4 Comparisons and Booleans
+
+Comparison operators: `== != < > <= >=`
+Boolean operators: `and or not` (short-circuiting)
+
+Precedence (loosest to tightest): `or` → `and` → comparisons → `+ -` → `* /`
+
+```
+let x = 10
+if x > 5 and x < 20 then
+  print "in range"
+end
+print not (x == 10)   # false
+```
+
+### Truthiness (the rule, all of it)
+
+Wherever a value is used as a condition (`if`, `while`, `and`, `or`, `not`):
+
+| Value          | Truthy? |
+|----------------|---------|
+| `false`        | false   |
+| `0`            | false   |
+| `0.0`          | false   |
+| `""` (empty)   | false   |
+| everything else| true    |
+
+No silent coercion: `"false"` is truthy (non-empty string), and comparing
+values of different types with `< > <= >=` is a runtime error.
+
+## 4.5 Control Flow
 
 ```
 if balance > 100 then
@@ -92,7 +122,7 @@ if balance > 100 then
 end
 ```
 
-## 4.5 Functions
+## 4.6 Functions
 
 ```
 fn greet(name)
