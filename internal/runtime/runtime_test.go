@@ -195,6 +195,62 @@ func TestTruthiness(t *testing.T) {
 	}
 }
 
+func TestIfElse(t *testing.T) {
+	cases := []struct{ src, want string }{
+		// then branch
+		{"let x = 10\nif x > 5 then\nprint \"big\"\nend\n", "big\n"},
+		// else branch
+		{"let x = 3\nif x > 5 then\nprint \"big\"\nelse\nprint \"small\"\nend\n", "small\n"},
+		// elif chains, first match wins
+		{"let x = 7\nif x > 10 then\nprint \"high\"\nelif x > 5 then\nprint \"mid\"\nelse\nprint \"low\"\nend\n", "mid\n"},
+		{"let x = 20\nif x > 10 then\nprint \"high\"\nelif x > 5 then\nprint \"mid\"\nelse\nprint \"low\"\nend\n", "high\n"},
+		{"let x = 1\nif x > 10 then\nprint \"high\"\nelif x > 5 then\nprint \"mid\"\nelse\nprint \"low\"\nend\n", "low\n"},
+		// multiple statements per branch
+		{"if true then\nlet a = 1\nlet b = 2\nprint a + b\nend\n", "3\n"},
+		// condition uses full expression grammar
+		{"let name = \"nesh\"\nif name == \"nesh\" and 1 < 2 then\nprint \"ok\"\nend\n", "ok\n"},
+		// nested ifs
+		{"let x = 15\nif x > 10 then\nif x > 20 then\nprint \"way high\"\nelse\nprint \"just high\"\nend\nend\n", "just high\n"},
+		// empty branches are legal
+		{"if false then\nelse\nend\nprint \"survived\"\n", "survived\n"},
+	}
+	for _, c := range cases {
+		out, err := run(t, c.src)
+		if err != nil {
+			t.Errorf("%q: unexpected error %v", c.src, err)
+			continue
+		}
+		if out != c.want {
+			t.Errorf("%q: got %q, want %q", c.src, out, c.want)
+		}
+	}
+}
+
+func TestIfParseErrors(t *testing.T) {
+	cases := []struct{ src, want string }{
+		{"if x > 5\nprint 1\nend\n", `1:9: expected "then", got "\n"`},
+		{"if true then\nprint 1\n", `3:1: expected "end", got ""`},
+		{"elif true then\nend\n", `1:1: expected statement (let, print, or if), got "elif"`},
+	}
+	for _, c := range cases {
+		script, perr := parser.Parse(c.src)
+		if perr == nil {
+			t.Errorf("%q: expected parse error, got %v", c.src, script)
+			continue
+		}
+		if perr.Error() != c.want {
+			t.Errorf("%q: got %q, want %q", c.src, perr.Error(), c.want)
+		}
+	}
+}
+
+func TestIfRuntimeErrorPosition(t *testing.T) {
+	_, err := run(t, "if true then\nprint missing\nend\n")
+	if err == nil || err.Error() != "2:7: undefined variable: missing" {
+		t.Fatalf("got %v, want position inside the taken branch", err)
+	}
+}
+
 func TestComparisonErrors(t *testing.T) {
 	cases := []struct{ src, want string }{
 		{"print 1 < \"a\"\n", `1:9: cannot compare 1 and a with "<"`},

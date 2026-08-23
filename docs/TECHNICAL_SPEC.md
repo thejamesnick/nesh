@@ -119,8 +119,16 @@ values of different types with `< > <= >=` is a runtime error.
 ```
 if balance > 100 then
   print "ok"
+elif balance > 0 then
+  print "low"
+else
+  print "empty"
 end
 ```
+
+Decision: Nesh has `elif` (not `else if`). Flat chains beat deep nesting —
+for humans reading them and for agents generating them. Indentation inside
+blocks is optional style, not syntax; blocks are closed by keywords.
 
 ## 4.6 Functions
 

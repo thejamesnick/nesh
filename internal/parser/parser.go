@@ -98,8 +98,10 @@ func (p *parser) parseStmt() (ast.Stmt, bool) {
 		return p.parseLet()
 	case token.PRINT:
 		return p.parsePrint()
+	case token.IF:
+		return p.parseIf()
 	default:
-		p.fail("expected statement (let or print), got %q", p.cur.Literal)
+		p.fail("expected statement (let, print, or if), got %q", p.cur.Literal)
 		return nil, false
 	}
 }
@@ -146,8 +148,110 @@ func (p *parser) expectStatementEnd() bool {
 		}
 		return true
 	}
+	// Inside a block, a block keyword (else/elif/end) legally terminates
+	// the last statement; the block parser consumes it.
+	switch p.cur.Type {
+	case token.ELSE, token.ELIF, token.END:
+		return true
+	}
 	p.fail("expected end of statement (newline), got %q", p.cur.Literal)
 	return false
+}
+
+// parseBlock parses statements until one of the stop tokens (or EOF),
+// skipping blank lines. The stop token is left as cur.
+func (p *parser) parseBlock(stop ...token.Type) ([]ast.Stmt, bool) {
+	var stmts []ast.Stmt
+	for {
+		for p.at(token.NEWLINE) {
+			p.next()
+		}
+		done := p.at(token.EOF)
+		for _, s := range stop {
+			if p.at(s) {
+				done = true
+				break
+			}
+		}
+		if done {
+			return stmts, true
+		}
+		stmt, ok := p.parseStmt()
+		if !ok {
+			return nil, false
+		}
+		stmts = append(stmts, stmt)
+		if !p.expectStatementEnd() {
+			return nil, false
+		}
+	}
+}
+
+func (p *parser) parseIf() (ast.Stmt, bool) {
+	pos := ast.Pos{Line: p.cur.Line, Column: p.cur.Column}
+	node := &ast.IfStmt{Pos: pos}
+	p.next() // consume 'if'
+	if !p.parseIfHead(node) {
+		return nil, false
+	}
+	cur := node
+	for {
+		thenStmts, ok := p.parseBlock(token.ELSE, token.ELIF, token.END)
+		if !ok {
+			return nil, false
+		}
+		cur.Then = thenStmts
+		switch {
+		case p.at(token.ELIF):
+			elifPos := ast.Pos{Line: p.cur.Line, Column: p.cur.Column}
+			nested := &ast.IfStmt{Pos: elifPos}
+			p.next() // consume 'elif'
+			if !p.parseIfHead(nested) {
+				return nil, false
+			}
+			cur.Else = []ast.Stmt{nested}
+			cur = nested
+		case p.at(token.ELSE):
+			p.next()
+			elseStmts, ok := p.parseBlock(token.END)
+			if !ok {
+				return nil, false
+			}
+			cur.Else = elseStmts
+			if !p.expect(token.END) {
+				return nil, false
+			}
+			return node, true
+		default:
+			if !p.expect(token.END) {
+				return nil, false
+			}
+			return node, true
+		}
+	}
+}
+
+// parseIfHead parses `if cond then` / `elif cond then`, consuming through
+// the `then`.
+func (p *parser) parseIfHead(node *ast.IfStmt) bool {
+	cond, ok := p.parseExpr(precLowest)
+	if !ok {
+		return false
+	}
+	node.Cond = cond
+	if !p.expect(token.THEN) {
+		return false
+	}
+	return true
+}
+
+func (p *parser) expect(t token.Type) bool {
+	if !p.at(t) {
+		p.fail("expected %q, got %q", t, p.cur.Literal)
+		return false
+	}
+	p.next()
+	return true
 }
 
 // parseExpr is precedence climbing: parse a unary operand, then fold

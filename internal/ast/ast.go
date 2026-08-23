@@ -45,6 +45,15 @@ type PrintStmt struct {
 	Args []Expr
 }
 
+// IfStmt is `if cond then ... elif cond then ... else ... end`.
+// An `elif` chain nests: Else holds either zero stmts or a single *IfStmt.
+type IfStmt struct {
+	Pos  Pos
+	Cond Expr
+	Then []Stmt
+	Else []Stmt
+}
+
 // Ident is a variable reference.
 type Ident struct {
 	Pos  Pos
@@ -98,6 +107,7 @@ func (s *Script) Position() Pos {
 
 func (s *LetStmt) Position() Pos    { return s.Pos }
 func (s *PrintStmt) Position() Pos  { return s.Pos }
+func (s *IfStmt) Position() Pos     { return s.Pos }
 func (e *Ident) Position() Pos      { return e.Pos }
 func (e *IntLit) Position() Pos     { return e.Pos }
 func (e *FloatLit) Position() Pos   { return e.Pos }
@@ -108,6 +118,7 @@ func (e *InfixExpr) Position() Pos  { return e.Pos }
 
 func (*LetStmt) stmtNode()   {}
 func (*PrintStmt) stmtNode() {}
+func (*IfStmt) stmtNode()    {}
 
 func (*Ident) exprNode()      {}
 func (*IntLit) exprNode()     {}

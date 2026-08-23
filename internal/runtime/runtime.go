@@ -116,9 +116,27 @@ func (r *Runtime) execStmt(stmt ast.Stmt) *Error {
 		}
 		r.out.WriteString(strings.Join(parts, " ") + "\n")
 		return nil
+	case *ast.IfStmt:
+		cond, err := r.eval(s.Cond)
+		if err != nil {
+			return err
+		}
+		if Truthy(cond) {
+			return r.execStmts(s.Then)
+		}
+		return r.execStmts(s.Else)
 	default:
 		return errAt(stmt.Position(), "cannot execute %T", stmt)
 	}
+}
+
+func (r *Runtime) execStmts(stmts []ast.Stmt) *Error {
+	for _, stmt := range stmts {
+		if err := r.execStmt(stmt); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *Runtime) eval(e ast.Expr) (Value, *Error) {

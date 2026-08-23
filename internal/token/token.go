@@ -50,6 +50,7 @@ const (
 	NOT    Type = "not"
 	TRUE   Type = "true"
 	FALSE  Type = "false"
+	ELIF   Type = "elif"
 )
 
 var keywords = map[string]Type{
@@ -58,6 +59,7 @@ var keywords = map[string]Type{
 	"if":     IF,
 	"then":   THEN,
 	"else":   ELSE,
+	"elif":   ELIF,
 	"end":    END,
 	"fn":     FN,
 	"return": RETURN,
