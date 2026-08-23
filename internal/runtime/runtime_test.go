@@ -439,6 +439,55 @@ func TestWhitespaceTolerance(t *testing.T) {
 	}
 }
 
+func TestEventStream(t *testing.T) {
+	var events []Event
+	out := &fakeOutput{}
+	rt := New(out)
+	rt.SetRunner(&fakeRunner{code: 3})
+	rt.SetEventSink(func(e Event) { events = append(events, e) })
+
+	script, perr := parser.Parse("let n = 2\nprint \"n is\" n\nlet code = run deploy\n")
+	if perr != nil {
+		t.Fatal(perr)
+	}
+	if err := rt.Run(script); err != nil {
+		t.Fatal(err)
+	}
+
+	wantTypes := []string{"let", "print", "command", "let"} // let code = run ... emits both
+	if len(events) != len(wantTypes) {
+		t.Fatalf("got %d events %+v, want %d", len(events), events, len(wantTypes))
+	}
+	for i, typ := range wantTypes {
+		if events[i].Type != typ {
+			t.Errorf("event %d: type %q, want %q", i, events[i].Type, typ)
+		}
+	}
+	if events[1].Text != "n is 2" || events[1].Line != 2 {
+		t.Errorf("print event wrong: %+v", events[1])
+	}
+	if events[2].Name != "deploy" || events[2].Code != 3 {
+		t.Errorf("command event wrong: %+v", events[2])
+	}
+
+	// errors emit an event too
+	events = nil
+	bad, _ := parser.Parse("print 1 / 0\n")
+	rerr := rt.Run(bad)
+	if rerr == nil || len(events) != 1 || events[0].Type != "error" {
+		t.Fatalf("error event missing: %v %+v", rerr, events)
+	}
+}
+
+func TestNoSinkMeansNoEvents(t *testing.T) {
+	out := &fakeOutput{}
+	rt := New(out)
+	script, _ := parser.Parse("let x = 1\nprint x\n")
+	if err := rt.Run(script); err != nil { // must not panic without a sink
+		t.Fatal(err)
+	}
+}
+
 func TestComparisonErrors(t *testing.T) {
 	cases := []struct{ src, want string }{
 		{"print 1 < \"a\"\n", `1:9: cannot compare 1 and a with "<"`},

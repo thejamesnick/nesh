@@ -2,12 +2,13 @@
 //
 // Contract (MODULES.md): dumb data carrying position info. No behavior
 // beyond what debugging needs. Imports token only.
+// JSON encoding for the agent API lives in json.go.
 package ast
 
 // Pos is a source position (1-based line and column).
 type Pos struct {
-	Line   int
-	Column int
+	Line   int `json:"line"`
+	Column int `json:"column"`
 }
 
 // Node is anything in the tree that knows where it came from.
@@ -17,7 +18,7 @@ type Node interface {
 
 // Script is a parsed .nsh file: a sequence of statements.
 type Script struct {
-	Stmts []Stmt
+	Stmts []Stmt `json:"stmts"`
 }
 
 // Stmt is a single statement.
@@ -34,119 +35,120 @@ type Expr interface {
 
 // LetStmt is `let name = value`.
 type LetStmt struct {
-	Pos   Pos
-	Name  string
-	Value Expr
+	Pos   Pos    `json:"pos"`
+	Name  string `json:"name"`
+	Value Expr   `json:"value"`
 }
 
 // PrintStmt is `print arg1 arg2 ...` (zero or more space-separated args).
 type PrintStmt struct {
-	Pos  Pos
-	Args []Expr
+	Pos  Pos    `json:"pos"`
+	Args []Expr `json:"args"`
 }
 
 // IfStmt is `if cond then ... elif cond then ... else ... end`.
 // An `elif` chain nests: Else holds either zero stmts or a single *IfStmt.
 type IfStmt struct {
-	Pos  Pos
-	Cond Expr
-	Then []Stmt
-	Else []Stmt
+	Pos  Pos    `json:"pos"`
+	Cond Expr   `json:"cond"`
+	Then []Stmt `json:"then"`
+	Else []Stmt `json:"else"`
 }
 
 // FnStmt is `fn name(params) ... end`. Functions are defined globally.
 type FnStmt struct {
-	Pos    Pos
-	Name   string
-	Params []string
-	Body   []Stmt
+	Pos    Pos      `json:"pos"`
+	Name   string   `json:"name"`
+	Params []string `json:"params"`
+	Body   []Stmt   `json:"body"`
 }
 
 // ReturnStmt is `return [expr]`; Value may be nil (implicit false).
 type ReturnStmt struct {
-	Pos   Pos
-	Value Expr
+	Pos   Pos  `json:"pos"`
+	Value Expr `json:"value,omitempty"`
 }
 
 // ExprStmt is a bare expression used as a statement — only calls today
 // (e.g. `deploy("prod")` for its side effect).
 type ExprStmt struct {
-	Pos  Pos
-	Expr Expr
+	Pos  Pos  `json:"pos"`
+	Expr Expr `json:"expr"`
 }
 
 // WhileStmt is `while cond ... end`.
 type WhileStmt struct {
-	Pos  Pos
-	Cond Expr
-	Body []Stmt
+	Pos  Pos    `json:"pos"`
+	Cond Expr   `json:"cond"`
+	Body []Stmt `json:"body"`
 }
 
 // CmdStmt is a bare system command: `git status --short`. Words are literal
 // (no variable expansion yet — Phase 3 decision).
 type CmdStmt struct {
-	Pos  Pos
-	Name string
-	Args []string
+	Pos  Pos      `json:"pos"`
+	Name string   `json:"name"`
+	Args []string `json:"args,omitempty"`
 }
 
 // RunExpr is `run <command>` in expression position; it evaluates to the
 // command's exit code as an Int.
 type RunExpr struct {
-	Pos  Pos
-	Name string
-	Args []string
+	Pos  Pos      `json:"pos"`
+	Name string   `json:"name"`
+	Args []string `json:"args,omitempty"`
 }
 
 // Ident is a variable reference.
 type Ident struct {
-	Pos  Pos
-	Name string
+	Pos  Pos    `json:"pos"`
+	Name string `json:"name"`
 }
 
 // IntLit is an integer literal.
 type IntLit struct {
-	Pos   Pos
-	Value int64
+	Pos   Pos   `json:"pos"`
+	Value int64 `json:"value"`
 }
 
 // FloatLit is a floating-point literal.
 type FloatLit struct {
-	Pos   Pos
-	Value float64
+	Pos   Pos     `json:"pos"`
+	Value float64 `json:"value"`
 }
 
 // StringLit is a string literal (already unescaped by the lexer).
 type StringLit struct {
-	Pos   Pos
-	Value string
+	Pos   Pos    `json:"pos"`
+	Value string `json:"value"`
 }
 
 // BoolLit is `true` or `false`.
 type BoolLit struct {
-	Pos   Pos
-	Value bool
+	Pos   Pos  `json:"pos"`
+	Value bool `json:"value"`
 }
 
-// PrefixExpr is a unary operation (currently: negation).
+// PrefixExpr is a unary operation (currently: negation, not).
 type PrefixExpr struct {
-	Pos   Pos
-	Op    string // "-"
-	Right Expr
+	Pos   Pos    `json:"pos"`
+	Op    string `json:"op"`
+	Right Expr   `json:"right"`
 }
 
 // InfixExpr is a binary operation: + - * / == != < > <= >= and or
 type InfixExpr struct {
-	Pos  Pos
-	Op   string
-	L, R Expr
+	Pos Pos    `json:"pos"`
+	Op  string `json:"op"`
+	L   Expr   `json:"left"`
+	R   Expr   `json:"right"`
 }
 
 // CallExpr is a function call: name(arg1, arg2, ...).
 type CallExpr struct {
-	Pos  Pos
-	Name string
-	Args []Expr
+	Pos  Pos    `json:"pos"`
+	Name string `json:"name"`
+	Args []Expr `json:"args,omitempty"`
 }
 
 func (s *Script) Position() Pos {

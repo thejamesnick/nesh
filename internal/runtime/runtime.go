@@ -85,6 +85,7 @@ type Runtime struct {
 	out    Output
 	scopes []map[string]Value
 	runner shell.CommandRunner
+	events func(Event)
 }
 
 // New builds a Runtime writing to out.
@@ -95,10 +96,33 @@ func New(out Output) *Runtime {
 // SetRunner enables system commands (`git status`, `run ...`).
 func (r *Runtime) SetRunner(runner shell.CommandRunner) { r.runner = runner }
 
+// Event is one structured execution step for the agent API (nesh --json).
+type Event struct {
+	Type   string   `json:"type"` // "print" | "let" | "command" | "error"
+	Line   int      `json:"line"`
+	Column int      `json:"column"`
+	Text   string   `json:"text,omitempty"`  // print output / error message
+	Name   string   `json:"name,omitempty"`  // let target / command name
+	Args   []string `json:"args,omitempty"`  // command args
+	Code   int      `json:"code,omitempty"`  // command exit code
+	Value  string   `json:"value,omitempty"` // let bound value
+}
+
+// SetEventSink registers a callback receiving each execution step.
+// Nil (the default) disables collection entirely — zero overhead.
+func (r *Runtime) SetEventSink(fn func(Event)) { r.events = fn }
+
+func (r *Runtime) emit(e Event) {
+	if r.events != nil {
+		r.events(e)
+	}
+}
+
 // Run executes every statement in script. A top-level `return` is an error.
 func (r *Runtime) Run(script *ast.Script) *Error {
 	ret, err := r.execBlock(script.Stmts)
 	if err != nil {
+		r.emit(Event{Type: "error", Line: err.Line, Column: err.Column, Text: err.Msg})
 		return err
 	}
 	if ret != nil {
@@ -145,6 +169,8 @@ func (r *Runtime) execStmt(stmt ast.Stmt) (*returnValue, *Error) {
 			return nil, err
 		}
 		r.scopes[len(r.scopes)-1][s.Name] = v // let always binds in the current scope
+		p := s.Position()
+		r.emit(Event{Type: "let", Line: p.Line, Column: p.Column, Name: s.Name, Value: v.String()})
 		return nil, nil
 	case *ast.PrintStmt:
 		parts := make([]string, len(s.Args))
@@ -155,7 +181,10 @@ func (r *Runtime) execStmt(stmt ast.Stmt) (*returnValue, *Error) {
 			}
 			parts[i] = v.String()
 		}
-		r.out.WriteString(strings.Join(parts, " ") + "\n")
+		text := strings.Join(parts, " ")
+		r.out.WriteString(text + "\n")
+		p := s.Position()
+		r.emit(Event{Type: "print", Line: p.Line, Column: p.Column, Text: text})
 		return nil, nil
 	case *ast.IfStmt:
 		cond, err := r.eval(s.Cond)
@@ -268,7 +297,9 @@ func (r *Runtime) runCommand(pos ast.Pos, name string, args []string) (int, *Err
 		}
 	}
 	w := outputWriter{r.out}
-	return r.runner.Run(name, args, w, w), nil
+	code := r.runner.Run(name, args, w, w)
+	r.emit(Event{Type: "command", Line: pos.Line, Column: pos.Column, Name: name, Args: args, Code: code})
+	return code, nil
 }
 
 // call evaluates a function call: args bind as locals in a fresh scope.

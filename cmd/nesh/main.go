@@ -7,16 +7,18 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 
+	"nesh/internal/ast"
 	"nesh/internal/parser"
 	"nesh/internal/runtime"
 	"nesh/internal/shell"
 )
 
-const version = "0.1.0"
+const version = "0.3.0-dev"
 
 const usage = `Nesh ` + version + ` — a human-readable shell for automation and scripting.
 
@@ -24,6 +26,7 @@ Usage:
   nesh script.nsh      run a script file
   nesh -c "print 1"    run a one-liner
   nesh                 interactive shell (REPL)
+  nesh --json file     JSON AST + execution events (agent API)
   nesh -h | help       this message
 
 Phase 1 language: let, print, arithmetic (+ - * /), strings, ints, floats.
@@ -40,6 +43,17 @@ func run(args []string) int {
 	case args[0] == "-h" || args[0] == "help" || args[0] == "--help":
 		fmt.Print(usage)
 		return 0
+	case args[0] == "--json":
+		rest := args[1:]
+		switch {
+		case len(rest) == 1:
+			return execFileJSON(rest[0])
+		case len(rest) == 2 && rest[0] == "-c":
+			return execSourceJSON(rest[1])
+		default:
+			fmt.Fprintln(os.Stderr, `usage: nesh --json script.nsh | nesh --json -c "print 1"`)
+			return 2
+		}
 	case args[0] == "-c":
 		if len(args) != 2 {
 			fmt.Fprintln(os.Stderr, `usage: nesh -c "print 1"`)
@@ -62,6 +76,76 @@ func execFile(path string) int {
 		return 2
 	}
 	return execSource(string(src))
+}
+
+// jsonReport is the agent-API document emitted by nesh --json.
+type jsonReport struct {
+	Nesh       string          `json:"nesh"`
+	Status     string          `json:"status"` // "ok" | "parse_error" | "runtime_error" | "io_error"
+	Ast        *ast.Script     `json:"ast,omitempty"`
+	ParseError *jsonErrInfo    `json:"parse_error,omitempty"`
+	RuntimeErr *jsonErrInfo    `json:"runtime_error,omitempty"`
+	Events     []runtime.Event `json:"events,omitempty"`
+}
+
+type jsonErrInfo struct {
+	Message string `json:"message"`
+	Line    int    `json:"line"`
+	Column  int    `json:"column"`
+}
+
+func emitJSON(report jsonReport) int {
+	report.Nesh = version
+	b, err := json.MarshalIndent(report, "", "  ")
+	if err != nil { // unreachable for our types
+		fmt.Fprintf(os.Stderr, "nesh: json encoding failed: %v\n", err)
+		return 1
+	}
+	fmt.Println(string(b))
+	switch report.Status {
+	case "ok":
+		return 0
+	case "io_error":
+		return 2
+	default:
+		return 1
+	}
+}
+
+func runWithEvents(src string) (*ast.Script, []runtime.Event, *parser.Error, *runtime.Error) {
+	script, perr := parser.Parse(src)
+	if perr != nil {
+		return nil, nil, perr, nil
+	}
+	var events []runtime.Event
+	rt := runtime.New(bufio.NewWriter(io.Discard))
+	rt.SetRunner(shell.RealRunner{})
+	rt.SetEventSink(func(e runtime.Event) { events = append(events, e) })
+	rerr := rt.Run(script)
+	return script, events, nil, rerr
+}
+
+func execSourceJSON(src string) int {
+	script, events, perr, rerr := runWithEvents(src)
+	report := jsonReport{Status: "ok", Events: events, Ast: script}
+	if perr != nil {
+		report.Status = "parse_error"
+		report.ParseError = &jsonErrInfo{perr.Msg, perr.Line, perr.Column}
+		return emitJSON(report)
+	}
+	if rerr != nil {
+		report.Status = "runtime_error"
+		report.RuntimeErr = &jsonErrInfo{rerr.Msg, rerr.Line, rerr.Column}
+	}
+	return emitJSON(report)
+}
+
+func execFileJSON(path string) int {
+	src, err := os.ReadFile(path)
+	if err != nil {
+		return emitJSON(jsonReport{Status: "io_error"})
+	}
+	return execSourceJSON(string(src))
 }
 
 func execSource(src string) int {
