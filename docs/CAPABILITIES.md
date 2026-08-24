@@ -34,6 +34,8 @@
 | Pipelines | `cat log \| grep error \| wc -l` | stdout→stdin between stages, concurrent like a shell; exit status = last stage |
 | Pipeline capture | `let n = run git log \| grep fix \| wc -l` | `run` evaluates to the last stage's exit code |
 | Error handling | `try ... on failure ... end` | `fail ["msg"]` raises; handler reads the `failure` variable; bare `try` swallows; failures cross function boundaries |
+| Exit codes | `exit [code]` | Sets the process exit code; not catchable by try |
+| Path words | `./script.sh`, `/usr/bin/git`, `go build ./...` | Words may start with `.` and `/`; `-7` stays unary minus |
 
 ## Error Model
 

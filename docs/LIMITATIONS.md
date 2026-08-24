@@ -10,9 +10,10 @@ see `task.md` (roadmap) and the Parking Lot for scheduling.*
 
 | Missing | Why it hurts | Status |
 |---|---|---|
+| **Output capture** (`let lines = $(cmd)`-class) | `run` returns exit codes only; command *output* can't be stored in a variable — found during dogfooding (gitcheck) | **Top of Phase 5** |
 | **Structured pipelines** (`\| filter user.active`) | Text pipelines only — no structured-data stages yet | Parking lot, after text pipelines prove out |
-| **Command paths starting with `/` or `./`** | `run /usr/bin/git` and `./script.sh` don't lex (division/dot conflict) — use `sh -c "..."` today | Needs lexer design work |
 | **Globbing** (`*.txt`) | Wildcards pass through literally to commands | Not started |
+| **`cd` builtin** | Scripts can't change working directory | Not started |
 
 ## Language Gaps
 

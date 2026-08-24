@@ -15,15 +15,16 @@ a task isn't "done" until its test box is checked, and every phase ends with PLA
 
 | Area | State |
 |---|---|
-| Language core (lexer, parser, AST, runtime) | ✅ Phases 1–3 complete — v0.1.0 / v0.2.0 / v0.3.0 |
-| Control flow, functions, loops, modules | ✅ done, tested (runtime 88%, parser 82%, lexer 98%) |
-| System commands via shell seam | ✅ CommandRunner + FileSystem interfaces |
-| Stdlib (`internal/builtin`) | ✅ 11 builtins, plugin registry |
+| Language core (lexer, parser, AST, runtime) | ✅ Phases 1–4 complete — v0.1.0 → v0.4.0 |
+| Control flow, functions, loops, modules | ✅ done, tested (runtime 85%+, parser 85%, lexer 98%) |
+| System commands via shell seam | ✅ CommandRunner + FileSystem + Opener interfaces |
+| Stdlib (`internal/builtin`) | ✅ 11 functions + printf/echo command builtins |
+| Shell ergonomics | ✅ break/continue, redirects, stdin, pipelines, try/fail, exit |
 | REPL | ✅ multi-line blocks, history, raw-mode editing |
 | Agent API (`nesh --json`) | ✅ kind-tagged AST + execution events |
-| Benchmarks | ✅ beats bash in all categories; memory profiled |
+| Benchmarks | ✅ fastest in 4/7 vs bash/dash/zsh; printf-builtin win |
 
-**Next phase: Phase 4 — Daily Usability (break/continue, redirection, pipelines, error handling, dogfooding) → Phase 5 — Share With The World (pkg manager, CI builds, docs, v1.0)**
+**Next phase: Phase 5 — Share With The World (output capture, pkg manager, CI builds, v1.0)**
 
 ---
 
@@ -103,10 +104,13 @@ is easier to write in Nesh than Bash. This is the "I actually use it every day" 
 - [x] T4.4 Error handling v1: `try ... on failure ... end`; commands don't abort script by default
   - DW: failing command inside try jumps to handler; runtime errors still abort; tests
   - Semantics: `fail ["msg"]` raises a catchable failure (crosses fn boundaries); handler sees the `failure` variable; bare `try` swallows; hard runtime errors are NOT catchable — bugs abort loudly
-- [~] T4.5 Dogfooding gate: rewrite 3 scripts you actually use today in `.nsh` — fix whatever hurts
+- [x] T4.5 Dogfooding gate: rewrite 3 scripts you actually use today in `.nsh` — fix whatever hurts
   - DW: 3 genuine personal automation scripts run daily without bash fallback
-- [~] T4.6 Phase close-out: benchmarks incl. pipeline category vs bash/dash/zsh, docs updated, tag `v0.4.0`
-  - Benchmarks done → benchmarks/results/v0.4.0.md (nesh fastest in 4/7). Redirect category flipped from 4.2x loss to a win via native printf/echo command builtins. Startup profiling deferred to Phase 5. Tag waits on T4.5.
+  - Done: scripts/check.nsh (build+vet+test gate), scripts/gitcheck.nsh (repo glance), scripts/bench.nsh (perf sanity). Friction fixed along the way: path words lexing (`./...`, `./script.sh`), `exit [code]` statement, git pager hang documented; output capture recorded as next feature.
+- [x] T4.6 Phase close-out: benchmarks incl. pipeline category vs bash/dash/zsh, docs updated, tag `v0.4.0`
+  - Benchmarks → benchmarks/results/v0.4.0.md (nesh fastest in 4/7). Redirect flipped from 4.2x loss to a win via native printf/echo command builtins. Startup profiling deferred to Phase 5.
+
+**Phase 4 ✅ COMPLETE — v0.4.0 tagged**
 
 ---
 

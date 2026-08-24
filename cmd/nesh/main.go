@@ -20,7 +20,7 @@ import (
 	"nesh/internal/shell"
 )
 
-const version = "0.3.0-dev"
+const version = "0.4.0"
 
 const usage = `Nesh ` + version + ` — a human-readable shell for automation and scripting.
 
