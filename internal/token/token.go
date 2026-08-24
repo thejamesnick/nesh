@@ -39,32 +39,33 @@ const (
 	EOF     Type = "EOF"
 
 	// Keywords
-	LET    Type = "let"
-	PRINT  Type = "print"
-	IF     Type = "if"
-	THEN   Type = "then"
-	ELSE   Type = "else"
-	END    Type = "end"
-	FN     Type = "fn"
-	RETURN Type = "return"
-	FOR    Type = "for"
-	IN     Type = "in"
-	WHILE  Type = "while"
-	AND    Type = "and"
-	OR     Type = "or"
-	NOT    Type = "not"
-	TRUE   Type = "true"
-	FALSE  Type = "false"
-	ELIF   Type = "elif"
-	RUN    Type = "run"
-	IMPORT Type = "import"
-	AS     Type = "as"
-	BREAK  Type = "break"
-	CONT   Type = "continue"
-	TRY    Type = "try"
-	ON     Type = "on"
-	FAIL   Type = "fail"
-	EXIT   Type = "exit"
+	LET     Type = "let"
+	PRINT   Type = "print"
+	IF      Type = "if"
+	THEN    Type = "then"
+	ELSE    Type = "else"
+	END     Type = "end"
+	FN      Type = "fn"
+	RETURN  Type = "return"
+	FOR     Type = "for"
+	IN      Type = "in"
+	WHILE   Type = "while"
+	AND     Type = "and"
+	OR      Type = "or"
+	NOT     Type = "not"
+	TRUE    Type = "true"
+	FALSE   Type = "false"
+	ELIF    Type = "elif"
+	RUN     Type = "run"
+	IMPORT  Type = "import"
+	CAPTURE Type = "capture"
+	AS      Type = "as"
+	BREAK   Type = "break"
+	CONT    Type = "continue"
+	TRY     Type = "try"
+	ON      Type = "on"
+	FAIL    Type = "fail"
+	EXIT    Type = "exit"
 )
 
 var keywords = map[string]Type{
@@ -76,6 +77,7 @@ var keywords = map[string]Type{
 	"elif":     ELIF,
 	"run":      RUN,
 	"import":   IMPORT,
+	"capture":  CAPTURE,
 	"as":       AS,
 	"end":      END,
 	"fn":       FN,

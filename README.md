@@ -92,18 +92,19 @@ You can also set Nesh as your default shell on macOS or Linux — but you don't 
 
 ## Project Status
 
-Phase 3 (AI & Polish) complete. Nesh runs real automation scripts:
+Phase 4 (Daily Usability) complete — v0.4.0. Nesh runs real automation scripts:
 
-- Full language: arithmetic, booleans, if/elif, functions + recursion, while/for-in loops
+- Full language: arithmetic, booleans, if/elif, functions + recursion, while/for-in loops with break/continue
 - System commands straight from PATH with exit-code capture via `run`
+- Pipelines, file redirection, stdin passthrough, and try/fail error handling
 - Standard library: string ops, math, file read/write
 - Modules: `import "x.nsh"` with optional namespacing (`as u`) and cycle detection
 - REPL with multi-line blocks, history, and line editing
 - `nesh --json`: machine-readable AST + execution events for AI agents
-- Faster than bash in every measured category (see benchmarks/results/)
+- Fastest in 4 of 7 benchmark categories vs bash/dash/zsh (see benchmarks/results/v0.4.0.md)
 
 Roadmap:
-- Phase 4 — Package manager, cross-platform distribution, v1.0 polish
+- Phase 5 — Output capture, package manager, cross-platform distribution, v1.0 polish
 
 ---
 
@@ -112,7 +113,7 @@ Roadmap:
 | File | Description |
 |------|-------------|
 | [docs/WHY_NESH.md](docs/WHY_NESH.md) | The philosophy and reason Nesh exists |
-| [docs/CAPABILITIES.md](docs/CAPABILITIES.md) | What Nesh can do right now (v0.3.0 snapshot) |
+| [docs/CAPABILITIES.md](docs/CAPABILITIES.md) | What Nesh can do right now (v0.4.0 snapshot) |
 | [docs/LIMITATIONS.md](docs/LIMITATIONS.md) | What Nesh can't do yet, and where it's tracked |
 | [docs/TECHNICAL_SPEC.md](docs/TECHNICAL_SPEC.md) | Full product and technical specification |
 | [docs/TECH_STACK.md](docs/TECH_STACK.md) | Technology decisions and component breakdown |

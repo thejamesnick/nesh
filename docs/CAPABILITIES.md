@@ -1,6 +1,6 @@
 # Capabilities — What Nesh Can Do Right Now
 
-*Snapshot of v0.3.0 (Phase 3 complete). Verified against the built binary on 2026-08-24.*
+*Snapshot of v0.4.0 (Phase 4 complete). Verified against the built binary on 2026-08-24.*
 
 ---
 
@@ -20,17 +20,16 @@
 
 ## Shell & System
 
-| Feature | Example |
-|---|---|
-| Run any PATH command directly | `git status`, `ls -la`, `docker compose up -d` |
-| Capture exit codes | `let code = run git status` — no `$?` needed |
-| Literal args + merged flags | `-la`, `--force` pass through cleanly |
-| Redirect stdout to file (write) | `git log > out.txt` |
-| Redirect stdout to file (append) | `run build >> build.log` |
-| Feed a file to stdin | `wc -l < access.log` |
-| Stdin passthrough | commands read the script's own stdin when no `<` redirect is given |
-
-| Redirect paths with absolute locations need quoting: `> "/var/log/app.log"`. |
+| Feature | Example | Notes |
+|---|---|---|
+| Run any PATH command directly | `git status`, `ls -la`, `docker compose up -d` | Unknown words resolve from PATH |
+| Capture exit codes | `let code = run git status` | No `$?` needed |
+| Capture command output | `let branch = capture git branch --show-current` | Final stage's stdout as a string (trailing newlines stripped); stderr still prints; exit code discarded — pair with `run` to check it |
+| Literal args + merged flags | `-la`, `--force` | Pass through cleanly, no word splitting |
+| Redirect stdout (write) | `git log > out.txt` | Absolute paths need quotes: `> "/var/log/app.log"` |
+| Redirect stdout (append) | `run build >> build.log` | |
+| Feed a file to stdin | `wc -l < access.log` | |
+| Stdin passthrough | — | Commands read the script's own stdin when no `<` redirect is given |
 | Pipelines | `cat log \| grep error \| wc -l` | stdout→stdin between stages, concurrent like a shell; exit status = last stage |
 | Pipeline capture | `let n = run git log \| grep fix \| wc -l` | `run` evaluates to the last stage's exit code |
 | Error handling | `try ... on failure ... end` | `fail ["msg"]` raises; handler reads the `failure` variable; bare `try` swallows; failures cross function boundaries |
@@ -63,7 +62,7 @@ end
 | Strings | `len`, `upper`, `lower`, `split`, `join`, `contains` |
 | Math | `abs`, `floor`, `round`, `min`, `max` |
 | Files | `read`, `write`, `exists` (via FileSystem seam) |
-| Commands | `printf` (common %s/%d/%% + \n\t), `echo [-n]` — native builtins, no process spawn |
+| Commands | `printf` (common %s/%d/%f + \n\t), `echo [-n]` — native builtins, no process spawn |
 
 ## Tooling
 
@@ -101,6 +100,7 @@ fn status(ok)
 end
 
 print "status:" status(false)
+print "negated:" not up
 ```
 
 Actual output from the built binary:
@@ -108,33 +108,33 @@ Actual output from the built binary:
 ```text
 host web-01 healthy, load 0.75
 status: down
+negated: false
 ```
 
 More runnable examples live in `testdata/`: `algorithms.nsh`, `pipeline.nsh`, `stdlib.nsh`, `importer.nsh`.
 
 ## Performance
 
-Beats Bash in every measured category (see `benchmarks/results/v0.2.0.md`):
+Fastest in 4 of 7 categories vs bash/dash/zsh (see `benchmarks/results/v0.4.0.md`):
 
-- Loops: ~2.4x faster (~670µs/op, low GC pressure)
-- Function calls: ~51x faster (~608µs/op)
-- Startup: parity with bash (~10ms warm)
+- **Wins** — loop, fn calls, control flow, redirect. The fn-call gap is structural: bash re-parses function bodies on every call; nesh compiles once (~50x faster)
+- **Vars/strings** — dash wins by a hair; startup-bound (~15ms vs ~20ms boot)
+- **Pipeline** — bash wins; adds ~8ms of parse/exec on top of two unavoidable external spawns
+- **Startup** — ~parity with bash (~10ms warm); profiling is the Phase 5 target
 
 ---
 
 ## Not Yet (Parking Lot)
 
-These are explicitly deferred — see `task.md`:
+These are explicitly deferred — see `task.md` and `LIMITATIONS.md`:
 
-- Pipelines (`|`) and stdin passthrough
-- Structured data: JSON literals, maps, `fetch`
-- Error handling: `try / on failure`
-- `break` / `continue`
-- Parallel execution (`parallel:` blocks), `retry n:`, task dependency graphs
-- Package manager (`nesh pkg`) — Phase 4, next up
+- Package manager (`nesh pkg`) — Phase 5
+- Maps/dicts, JSON literals, `fetch` — parking lot
+- Structured pipelines (`| filter user.active`) — parking lot
+- `parallel:` blocks, `retry n:`, task dependency graphs — Phase 6+
+- Globbing (`*.txt`), `cd` builtin, string interpolation — see LIMITATIONS.md
 
 ## Next Phase
 
-**Phase 4 — Ecosystem**: final benchmark suite vs bash/dash/zsh, profiling,
-`nesh pkg install/run`, cross-platform CI builds, user guide + syntax reference,
-dogfooding 5 real scripts, then tag `v1.0.0`.
+**Phase 5 — Share With The World**: `nesh pkg`, cross-platform CI builds,
+user guide + syntax reference, then tag `v1.0.0`.

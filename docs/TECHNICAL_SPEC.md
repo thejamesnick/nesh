@@ -158,9 +158,9 @@ while i < 10
 end
 ```
 
-There is no `break`/`continue` yet (Phase 3 candidate if needed). An
+`break` and `continue` work in both loop forms (shipped in Phase 4). An
 infinite loop is the author's responsibility, same as bash — no guard.
-`for x in list` arrives with list values.
+`for x in list` iterates list values (shipped with list values, Phase 3).
 
 ## 4.6 Functions
 
@@ -359,29 +359,29 @@ print "hello world"
 
 ---
 
-# 11. Future Roadmap
+# 11. Roadmap
 
-## Phase 1
-- Core interpreter in Go
-- Lexer and parser
-- Basic commands (print, let, if)
-- CLI execution
+The phase plan lives in `task.md` (the single source of truth). This is the
+shape of it, kept in sync:
 
-## Phase 2
-- Functions
-- Script modules
-- Improved error handling
-- Standard library expansion
+## Phase 1 — Foundation (done, v0.1.0)
+- Core interpreter in Go: lexer, parser, evaluator
+- CLI execution (`nesh script.nsh`, `nesh -c`)
 
-## Phase 3
-- AI integration layer
-- Natural language to Nesh translation
-- Structured execution APIs
+## Phase 2 — Core Language (done, v0.2.0)
+- if/elif/else, functions + recursion, loops, PATH commands, `run`
 
-## Phase 4
-- Package manager
-- Ecosystem tooling
-- Cross-platform distribution
+## Phase 3 — AI & Polish (done, v0.3.0)
+- REPL (history, raw mode, multi-line), `nesh --json` agent API
+- Stdlib builtins, modules with cycle detection
+
+## Phase 4 — Daily Usability (done, v0.4.0)
+- break/continue, redirection + stdin, text pipelines, try/fail
+- Dogfooded scripts, 7-category benchmarks vs bash/dash/zsh
+
+## Phase 5 — Share With The World (in progress)
+- Output capture, package manager, cross-platform CI builds,
+  user guide, v1.0.0
 
 ---
 

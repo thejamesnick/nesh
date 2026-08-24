@@ -31,8 +31,9 @@ Usage:
   nesh --json file     JSON AST + execution events (agent API)
   nesh -h | help       this message
 
-Phase 1 language: let, print, arithmetic (+ - * /), strings, ints, floats.
-Everything else is on the roadmap (task.md).`
+Language: let/print, arithmetic, if/elif/else, while/for-in loops,
+functions, modules, pipelines, redirection, try/fail, and any command
+from PATH. Roadmap: task.md.`
 
 func main() {
 	os.Exit(run(os.Args[1:]))

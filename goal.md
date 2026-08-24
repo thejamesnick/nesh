@@ -1,7 +1,7 @@
 # goal.md — What We're Building and Why
 
 *The single source of truth for direction. If a decision conflicts with this file, this file wins.
-Last updated: 2026-08-23.*
+Last updated: 2026-08-24.*
 
 ---
 
@@ -59,10 +59,10 @@ without a manual and reliably generatable by AI agents.
 
 ## Success = Done When
 
-- [ ] M1: `nesh script.nsh` executes print/let/arithmetic — **target Sep 7, 2026**
-- [ ] M2: if/else, functions, PATH commands, working REPL — **target Sep 21, 2026**
-- [ ] M3: Helpful errors, history/multi-line REPL, JSON AST export (`--json`), file/string/math builtins, basic modules — **target Oct 5, 2026**
-- [ ] M4: `nesh pkg` installs/runs packages, macOS/Linux/Windows builds, ≥70% benchmark wins, real-world scripts work — **target Oct 19, 2026**
+- [x] M1: `nesh script.nsh` executes print/let/arithmetic — **done: v0.1.0 (2026-08-23)**
+- [x] M2: if/else, functions, PATH commands, working REPL — **done: v0.2.0 (2026-08-23)**
+- [x] M3: Helpful errors, history/multi-line REPL, JSON AST export (`--json`), file/string/math builtins, basic modules — **done: v0.3.0 (2026-08-23)**
+- [~] M4: `nesh pkg` installs/runs packages, macOS/Linux/Windows builds, ≥70% benchmark wins (4/7 today), real-world scripts work (3 dogfooded) — **target Oct 19, 2026**
 - [ ] A developer and an AI agent can both read the same `deploy.nsh` and agree on what it does
 
 ## The Long Game

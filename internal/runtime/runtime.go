@@ -472,6 +472,8 @@ func (r *Runtime) eval(e ast.Expr) (Value, *Error) {
 			return nil, err
 		}
 		return Int(code), nil
+	case *ast.CaptureExpr:
+		return r.capture(n)
 	case *ast.PrefixExpr:
 		v, err := r.eval(n.Right)
 		if err != nil {
@@ -594,6 +596,14 @@ func (w outputWriter) Write(p []byte) (int, error) { return w.o.WriteString(stri
 // Each non-final stage's stdout streams into the next stage's stdin
 // (concurrently, like a shell); the returned code is the LAST stage's.
 func (r *Runtime) runCommand(pos ast.Pos, name string, args []string, redirects []ast.Redirect, pipe []ast.CmdStage) (int, *Error) {
+	return r.runCommandWith(pos, name, args, redirects, pipe, nil)
+}
+
+// runCommandWith is runCommand plus an optional capture sink: when
+// captureOut is non-nil, the final stage's stdout streams into it instead
+// of the output sink — unless that stage redirects its own stdout, which
+// wins (bash-style: `capture cmd > file` captures nothing).
+func (r *Runtime) runCommandWith(pos ast.Pos, name string, args []string, redirects []ast.Redirect, pipe []ast.CmdStage, captureOut io.Writer) (int, *Error) {
 	stages := make([]ast.CmdStage, 0, len(pipe)+1)
 	first := ast.CmdStage{Name: name, Args: args, Redirects: redirects}
 	stages = append(stages, first)
@@ -688,7 +698,11 @@ func (r *Runtime) runCommand(pos ast.Pos, name string, args []string, redirects 
 		}
 
 		if i == n-1 {
-			codes[i] = r.execStage(st, stdin, stdout, stderrW)
+			out := stdout
+			if captureOut != nil && !claimsStdout(st) {
+				out = captureOut
+			}
+			codes[i] = r.execStage(st, stdin, out, stderrW)
 			closeAll(closers)
 			r.mu.Lock()
 			r.emit(Event{Type: "command", Line: pos.Line, Column: pos.Column, Name: st.Name, Args: st.Args, Code: codes[i]})
@@ -722,6 +736,20 @@ func (r *Runtime) runCommand(pos ast.Pos, name string, args []string, redirects 
 	code := codes[n-1]
 	closeAll(pipeReaders)
 	return code, nil
+}
+
+// capture evaluates `capture <command> [| stages]`: it runs the pipeline
+// with the final stage's stdout collected into a buffer and returns it as
+// a Str. Stderr still streams to the output sink, and the exit code is
+// discarded by design (check it with `run`). Trailing newlines are stripped,
+// matching bash $(...) command substitution.
+func (r *Runtime) capture(e *ast.CaptureExpr) (Value, *Error) {
+	var buf strings.Builder
+	_, err := r.runCommandWith(e.Pos, e.Name, e.Args, e.Redirects, e.Pipe, &buf)
+	if err != nil {
+		return nil, err
+	}
+	return Str(strings.TrimRight(buf.String(), "\n")), nil
 }
 
 // execStage runs one pipeline stage: a command builtin if one is

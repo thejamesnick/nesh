@@ -2,7 +2,7 @@
 
 *Living document. Update status as work happens. Rules: one task in progress at a time,
 a task isn't "done" until its test box is checked, and every phase ends with PLAN/goal docs updated.*
-*Last updated: 2026-08-23.*
+*Last updated: 2026-08-24.*
 
 ---
 
@@ -18,13 +18,13 @@ a task isn't "done" until its test box is checked, and every phase ends with PLA
 | Language core (lexer, parser, AST, runtime) | ✅ Phases 1–4 complete — v0.1.0 → v0.4.0 |
 | Control flow, functions, loops, modules | ✅ done, tested (runtime 85%+, parser 85%, lexer 98%) |
 | System commands via shell seam | ✅ CommandRunner + FileSystem + Opener interfaces |
-| Stdlib (`internal/builtin`) | ✅ 11 functions + printf/echo command builtins |
-| Shell ergonomics | ✅ break/continue, redirects, stdin, pipelines, try/fail, exit |
+| Stdlib (`internal/builtin`) | ✅ 14 functions + printf/echo command builtins |
+| Shell ergonomics | ✅ break/continue, redirects, stdin, pipelines, capture, try/fail, exit |
 | REPL | ✅ multi-line blocks, history, raw-mode editing |
 | Agent API (`nesh --json`) | ✅ kind-tagged AST + execution events |
 | Benchmarks | ✅ fastest in 4/7 vs bash/dash/zsh; printf-builtin win |
 
-**Next phase: Phase 5 — Share With The World (output capture, pkg manager, CI builds, v1.0)**
+**Next phase: Phase 5 — Share With The World (pkg manager, CI builds, v1.0)**
 
 ---
 
@@ -64,7 +64,7 @@ a task isn't "done" until its test box is checked, and every phase ends with PLA
 - [x] T2.2 `if cond then ... elif ... else ... end` execution — `elif` decided YES (flat chains, spec 4.5); nested ifs work; REPL multi-line still Phase 3 (T3.2)
 - [x] T2.3 `fn name(params) ... end` with `return`; scoping decided: params/let are call-locals, reads fall back to globals, fns global, implicit return = false (spec 4.6)
 - [x] T2.4 Function calls as expressions AND bare-call statements (`deploy("prod")`); recursion works (factorial/fib tested)
-- [~] T2.5 Loops: `while cond ... end` done; `for x in list` blocked on list-value decision (literals `[1, 2, 3]`?); no break/continue yet (documented)
+- [x] T2.5 Loops: `while cond ... end` done in Phase 2; `for x in list` landed with list values (T3.4); `break`/`continue` landed (T4.1)
 - [x] T2.6 Unknown command → exec from PATH via `internal/shell.CommandRunner` seam; literal word args, flag merging (`-la`, `--force`); `run cmd` expression = exit code (the `$?`-successor idiom: `let code = run git status`); variable-shadow guard; no stdin passthrough yet
 - [x] T2.7 Unit + integration tests (runtime 88%, parser 82%, lexer 98%; control-flow/fn >85% via runtime); 3 real integration scripts in testdata
 - [x] T2.8 Phase close-out: loop/variable/fn benchmarks vs Bash — nesh wins all (2.4x loop, 51x fn); results in benchmarks/results/v0.2.0.md; tag `v0.2.0`
@@ -77,7 +77,7 @@ a task isn't "done" until its test box is checked, and every phase ends with PLA
 
 **DW: REPL is daily-usable, errors point at line:col, agents can consume `nesh --json` output.**
 
-- [ ] T3.1 Error system: parse + runtime errors with line/col, "expected X, got Y" messages
+- [x] T3.1 Error system: parse + runtime errors with line/col, "expected X, got Y" messages — errors carried position from Phase 1; message wording consolidated here
 - [x] T3.2 REPL: history, line editing (raw mode), multi-line blocks via parser.OpenBlocks
 - [x] T3.3 `nesh --json script.nsh`: JSON AST (kind-tagged nodes) + structured execution events {status, ast, events, errors}
 - [x] T3.4 Stdlib via `internal/builtin` plugins: len/upper/lower/split/join/contains, abs/floor/round/min/max, read/write/exists (FileSystem seam); List values + `for x in` shipped alongside
@@ -118,16 +118,17 @@ is easier to write in Nesh than Bash. This is the "I actually use it every day" 
 
 **DW: a stranger can install Nesh on macOS/Linux/Windows and run someone else's package.**
 
-- [ ] T5.1 Profile hot paths (pprof); optimize only with profiling proof (sync.Pool, interning, buffered I/O)
-- [ ] T5.2 `nesh pkg install/run` — minimal registry = git URLs
+- [x] T5.1 Output capture: `let x = capture cmd [| stages]` — evaluates to the final stage's stdout as a Str (trailing newlines stripped, bash $(...) style)
+  - DW: capture works in expression position; stderr still prints; documented + tested
+  - Done: parser + runtime wired; 8 tests in capture_test.go (pipeline, newline strip, exit-code discard, redirect-wins, builtin, stderr separation, no-runner)
+- [ ] T5.2 Profile hot paths (pprof); optimize only with profiling proof (sync.Pool, interning, buffered I/O)
+- [ ] T5.3 `nesh pkg install/run` — minimal registry = git URLs
   - DW: install from a git URL, run its entry script; version pinning decided
-- [ ] T5.3 Cross-platform builds (macOS, Linux, Windows) in GitHub Actions CI + regression benchmarks
+- [ ] T5.4 Cross-platform builds (macOS, Linux, Windows) in GitHub Actions CI + regression benchmarks
   - DW: green CI matrix, release binaries downloadable
-- [ ] T5.4 Docs: user guide, syntax reference, examples that all run
+- [ ] T5.5 Docs: user guide, syntax reference, examples that all run
   - DW: docs/CAPABILITIES.md examples + guide cover 100% of shipped syntax
-- [ ] T5.5 Launch polish, tag `v1.0.0`
-
----
+- [ ] T5.6 Launch polish, tag `v1.0.0`
 
 ## Parking Lot (explicitly NOT now)
 

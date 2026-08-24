@@ -51,7 +51,7 @@ func TestContinueWhile(t *testing.T) {
 
 func TestBreakContinueForIn(t *testing.T) {
 	cases := []struct{ src, want string }{
-		{"let total = 0\nfor x in range(5)\nif x == 3 then\nbreak\nend\nlet total = total + x\nend\nprint total\n", "3\n"}, // 1+2+3
+		{"let total = 0\nfor x in range(5)\nif x == 3 then\nbreak\nend\nlet total = total + x\nend\nprint total\n", "3\n"},                                   // 1+2+3
 		{"let total = 0\nfor x in range(5)\nif x == 2 then\ncontinue\nend\nif x == 4 then\ncontinue\nend\nlet total = total + x\nend\nprint total\n", "9\n"}, // 1+3+5
 	}
 	for _, c := range cases {

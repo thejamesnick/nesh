@@ -223,7 +223,7 @@ func TestRedirectErrors(t *testing.T) {
 		src string
 		col int
 	}{
-		{"git log >\n", 10},      // missing path: error points at the newline
+		{"git log >\n", 10},       // missing path: error points at the newline
 		{"cat < # comment\n", 16}, // missing path: comment skipped, error at newline
 	}
 	for _, c := range cases {
@@ -291,6 +291,54 @@ func TestPipelineErrors(t *testing.T) {
 	}
 }
 
+func TestCaptureExpr(t *testing.T) {
+	s, err := Parse("let x = capture git branch --show-current\n")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	capE := s.Stmts[0].(*ast.LetStmt).Value.(*ast.CaptureExpr)
+	if capE.Name != "git" || len(capE.Args) != 2 || capE.Args[0] != "branch" || capE.Args[1] != "--show-current" {
+		t.Fatalf("capture expr wrong: %+v", capE)
+	}
+
+	// capture with pipeline stages lands in Pipe
+	s, err = Parse("let n = capture git log | grep fix | wc -l\n")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	capE2 := s.Stmts[0].(*ast.LetStmt).Value.(*ast.CaptureExpr)
+	if capE2.Name != "git" || len(capE2.Pipe) != 2 || capE2.Pipe[1].Name != "wc" {
+		t.Fatalf("capture pipeline wrong: %+v", capE2)
+	}
+
+	// capture works in any expression position, not just let
+	s, err = Parse("print capture echo hi\n")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	arg, ok := s.Stmts[0].(*ast.PrintStmt).Args[0].(*ast.CaptureExpr)
+	if !ok || arg.Name != "echo" || len(arg.Args) != 1 || arg.Args[0] != "hi" {
+		t.Fatalf("print arg: got %#v, want CaptureExpr(echo hi)", s.Stmts[0].(*ast.PrintStmt).Args[0])
+	}
+
+	// bare capture is a statement (mirrors run) and discards the value
+	s, err = Parse("capture git status\n")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok := s.Stmts[0].(*ast.ExprStmt).Expr.(*ast.CaptureExpr); !ok {
+		t.Fatalf("bare capture statement: got %#v", s.Stmts[0])
+	}
+
+	// capture with nothing after it errors
+	if _, err := Parse("let x = capture\n"); err == nil {
+		t.Fatal("expected error for bare capture")
+	}
+	if _, err := Parse("let x = capture 42\n"); err == nil {
+		t.Fatal("expected error for numeric command after capture")
+	}
+}
+
 func TestTryOnFailure(t *testing.T) {
 	s, err := Parse("try\ndeploy\non failure\nprint failure\nend\n")
 	if err != nil {
@@ -314,8 +362,8 @@ func TestTryOnFailure(t *testing.T) {
 	}
 
 	for _, src := range []string{
-		"try\nx\non boom\nend\n",  // wrong word after on
-		"try\nx\non failure\n",    // missing end
+		"try\nx\non boom\nend\n", // wrong word after on
+		"try\nx\non failure\n",   // missing end
 	} {
 		if _, err := Parse(src); err == nil {
 			t.Errorf("input %q: expected error, got none", src)

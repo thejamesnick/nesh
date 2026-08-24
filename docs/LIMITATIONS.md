@@ -1,6 +1,6 @@
 # Limitations — What Nesh Can't Do Yet
 
-*Companion to [CAPABILITIES.md](CAPABILITIES.md). Snapshot of v0.3.0, 2026-08-24.
+*Companion to [CAPABILITIES.md](CAPABILITIES.md). Snapshot of v0.4.0, 2026-08-24.
 Each item lists why it matters and where it's tracked. Nothing here is accidental —
 see `task.md` (roadmap) and the Parking Lot for scheduling.*
 
@@ -10,7 +10,7 @@ see `task.md` (roadmap) and the Parking Lot for scheduling.*
 
 | Missing | Why it hurts | Status |
 |---|---|---|
-| **Output capture** (`let lines = $(cmd)`-class) | `run` returns exit codes only; command *output* can't be stored in a variable — found during dogfooding (gitcheck) | **Top of Phase 5** |
+| **Separate stderr redirection** | Command stderr writes to the same sink as stdout — can't redirect or pipe stderr independently | Not scheduled |
 | **Structured pipelines** (`\| filter user.active`) | Text pipelines only — no structured-data stages yet | Parking lot, after text pipelines prove out |
 | **Globbing** (`*.txt`) | Wildcards pass through literally to commands | Not started |
 | **`cd` builtin** | Scripts can't change working directory | Not started |
@@ -23,7 +23,6 @@ see `task.md` (roadmap) and the Parking Lot for scheduling.*
 | **Maps / dicts** | Only lists exist; keyed data needs parallel lists | Parking lot (structured data) |
 | **JSON literals & parsing** | Can't parse or emit JSON natively; agents/APIs need this badly | Parking lot, after core stable |
 | **`fetch` / networking** | No HTTP in stdlib — must shell out to `curl` | Parking lot |
-| **Error handling** (`try / on failure`) | Runtime errors abort the script; can't catch and recover | Parking lot; needs design doc |
 | **`retry n:` / timeouts** | Unreliable ops need manual loops | Parking lot |
 | **Parallel execution** (`parallel:` blocks) | Everything runs sequentially | Parking lot; needs concurrency design first |
 | **Task dependency graphs** (`task / depends_on`) | Workflow orchestration not expressible | Parking lot |
@@ -34,8 +33,8 @@ see `task.md` (roadmap) and the Parking Lot for scheduling.*
 
 | Missing | Why it hurts | Status |
 |---|---|---|
-| **Package manager** (`nesh pkg install/run`) | No way to share/install scripts from git URLs | **T4.3 — next up** |
-| **Cross-platform builds/CI** | macOS/Linux only today, no Windows build target verified | **T4.4 — Phase 4** |
+| **Package manager** (`nesh pkg install/run`) | No way to share/install scripts from git URLs | **T5.3 — Phase 5** |
+| **Cross-platform builds/CI** | macOS/Linux only today, no Windows build target verified | **T5.4 — Phase 5** |
 | **Tab completion** in REPL | Commands/paths/fns not completed | Not scheduled |
 | **Syntax highlighting / editor support** | No vim/VS Code grammar for `.nsh` | Not scheduled |
 | **Login-shell readiness** | Can't reliably replace bash as default shell yet (env, job control, rc files) | Post-v1.0 consideration |
@@ -44,9 +43,7 @@ see `task.md` (roadmap) and the Parking Lot for scheduling.*
 
 | Missing | Why it hurts | Status |
 |---|---|---|
-| **User guide + syntax reference** | Docs are internal specs; nothing written for end users | **T4.5 — Phase 4** |
-| **Real-world script validation** | Language is benchmark-proven but not dogfooded on genuine automation | **T4.6 — Phase 4** |
-| **Benchmark coverage vs dash/zsh** | Current wins are vs bash only | **T4.1 — Phase 4** |
+| **User guide + syntax reference** | Docs are internal specs; nothing written for end users | **T5.5 — Phase 5** |
 
 ---
 

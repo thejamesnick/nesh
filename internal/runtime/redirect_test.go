@@ -70,9 +70,13 @@ func TestRedirectWriteToFile(t *testing.T) {
 // fakeFSWithOpener adapts a fakeOpener to the FileSystem seam.
 type fakeFSWithOpener struct{ *fakeOpener }
 
-func (fakeFSWithOpener) ReadFile(path string) ([]byte, error)         { return nil, fmt.Errorf("not implemented") }
-func (fakeFSWithOpener) WriteFile(path string, data []byte) error     { return fmt.Errorf("not implemented") }
-func (fakeFSWithOpener) Exists(path string) bool                      { return false }
+func (fakeFSWithOpener) ReadFile(path string) ([]byte, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (fakeFSWithOpener) WriteFile(path string, data []byte) error {
+	return fmt.Errorf("not implemented")
+}
+func (fakeFSWithOpener) Exists(path string) bool { return false }
 
 func TestRedirectAppend(t *testing.T) {
 	opener := newFakeOpener()

@@ -155,6 +155,13 @@ func (p *parser) parseStmt() (ast.Stmt, bool) {
 			return nil, false
 		}
 		return &ast.ExprStmt{Pos: pos, Expr: runExpr}, true
+	case token.CAPTURE:
+		pos := ast.Pos{Line: p.cur.Line, Column: p.cur.Column}
+		capExpr, ok := p.parseCaptureExpr()
+		if !ok {
+			return nil, false
+		}
+		return &ast.ExprStmt{Pos: pos, Expr: capExpr}, true
 	default:
 		p.fail("expected statement (let, print, if, or fn), got %q", p.cur.Literal)
 		return nil, false
@@ -291,10 +298,27 @@ func (p *parser) parseRedirect() (ast.Redirect, bool) {
 // parseRunExpr parses `run <command>` in expression position.
 // With `|`, the extra stages land in RunExpr.Pipe.
 func (p *parser) parseRunExpr() (ast.Expr, bool) {
+	return p.parseCommandExpr(false)
+}
+
+// parseCaptureExpr parses `capture <command> [| stages]` in expression
+// position — the $(...)-successor: it evaluates to the command's stdout
+// as a string.
+func (p *parser) parseCaptureExpr() (ast.Expr, bool) {
+	return p.parseCommandExpr(true)
+}
+
+// parseCommandExpr parses `run`/`capture` followed by a command phrase
+// and optional pipeline stages. The keyword is the current token.
+func (p *parser) parseCommandExpr(capture bool) (ast.Expr, bool) {
 	pos := ast.Pos{Line: p.cur.Line, Column: p.cur.Column}
-	p.next() // consume 'run'
+	kw := "run"
+	if capture {
+		kw = "capture"
+	}
+	p.next() // consume 'run' or 'capture'
 	if p.atStatementBoundary() || p.cur.Type != token.IDENT {
-		p.fail("expected command name after run, got %q", p.cur.Literal)
+		p.fail("expected command name after %s, got %q", kw, p.cur.Literal)
 		return nil, false
 	}
 	first := &ast.CmdStage{Name: p.cur.Literal}
@@ -302,7 +326,12 @@ func (p *parser) parseRunExpr() (ast.Expr, bool) {
 	if !p.parseStageTail(first, true) {
 		return nil, false
 	}
-	expr := &ast.RunExpr{Pos: pos, Name: first.Name, Args: first.Args, Redirects: first.Redirects}
+	var expr ast.Expr
+	if capture {
+		expr = &ast.CaptureExpr{Pos: pos, Name: first.Name, Args: first.Args, Redirects: first.Redirects}
+	} else {
+		expr = &ast.RunExpr{Pos: pos, Name: first.Name, Args: first.Args, Redirects: first.Redirects}
+	}
 	for p.at(token.PIPE) {
 		p.next() // consume '|'
 		if !p.at(token.IDENT) {
@@ -314,7 +343,12 @@ func (p *parser) parseRunExpr() (ast.Expr, bool) {
 		if !p.parseStageTail(stage, true) {
 			return nil, false
 		}
-		expr.Pipe = append(expr.Pipe, *stage)
+		switch e := expr.(type) {
+		case *ast.RunExpr:
+			e.Pipe = append(e.Pipe, *stage)
+		case *ast.CaptureExpr:
+			e.Pipe = append(e.Pipe, *stage)
+		}
 	}
 	return expr, true
 }
@@ -767,6 +801,8 @@ func (p *parser) parsePrimary() (ast.Expr, bool) {
 		return &ast.BoolLit{Pos: pos, Value: v}, true
 	case token.RUN:
 		return p.parseRunExpr()
+	case token.CAPTURE:
+		return p.parseCaptureExpr()
 	case token.LPAREN:
 		p.next()
 		inner, ok := p.parseExpr(precLowest)

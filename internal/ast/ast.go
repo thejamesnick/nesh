@@ -106,10 +106,10 @@ type ContinueStmt struct {
 // `failure` variable holds the message. Without a handler, failures are
 // swallowed and execution continues after `end`.
 type TryStmt struct {
-	Pos      Pos    `json:"pos"`
-	Try      []Stmt `json:"try"`
-	On       []Stmt `json:"on,omitempty"` // present when HasOn
-	HasOn    bool   `json:"has_on"`
+	Pos   Pos    `json:"pos"`
+	Try   []Stmt `json:"try"`
+	On    []Stmt `json:"on,omitempty"` // present when HasOn
+	HasOn bool   `json:"has_on"`
 }
 
 // FailStmt is `fail ["message"]` — raises a catchable failure. Without a
@@ -177,6 +177,18 @@ type RunExpr struct {
 	Pipe      []CmdStage `json:"pipe,omitempty"`
 }
 
+// CaptureExpr is `capture <command> [| stages]` in expression position;
+// it evaluates to the final stage's STDOUT as a Str (trailing newlines
+// stripped, bash $(...) style). Stderr still goes to the terminal; the
+// exit code is discarded (check with run instead).
+type CaptureExpr struct {
+	Pos       Pos        `json:"pos"`
+	Name      string     `json:"name"`
+	Args      []string   `json:"args,omitempty"`
+	Redirects []Redirect `json:"redirects,omitempty"`
+	Pipe      []CmdStage `json:"pipe,omitempty"`
+}
+
 // Ident is a variable reference.
 type Ident struct {
 	Pos  Pos    `json:"pos"`
@@ -236,55 +248,57 @@ func (s *Script) Position() Pos {
 	return s.Stmts[0].Position()
 }
 
-func (s *ImportStmt) Position() Pos { return s.Pos }
-func (s *LetStmt) Position() Pos    { return s.Pos }
-func (s *PrintStmt) Position() Pos  { return s.Pos }
-func (s *IfStmt) Position() Pos     { return s.Pos }
-func (s *FnStmt) Position() Pos     { return s.Pos }
-func (s *ReturnStmt) Position() Pos { return s.Pos }
-func (s *ExprStmt) Position() Pos   { return s.Expr.Position() }
-func (s *WhileStmt) Position() Pos  { return s.Pos }
-func (s *ForStmt) Position() Pos    { return s.Pos }
-func (s *BreakStmt) Position() Pos  { return s.Pos }
+func (s *ImportStmt) Position() Pos   { return s.Pos }
+func (s *LetStmt) Position() Pos      { return s.Pos }
+func (s *PrintStmt) Position() Pos    { return s.Pos }
+func (s *IfStmt) Position() Pos       { return s.Pos }
+func (s *FnStmt) Position() Pos       { return s.Pos }
+func (s *ReturnStmt) Position() Pos   { return s.Pos }
+func (s *ExprStmt) Position() Pos     { return s.Expr.Position() }
+func (s *WhileStmt) Position() Pos    { return s.Pos }
+func (s *ForStmt) Position() Pos      { return s.Pos }
+func (s *BreakStmt) Position() Pos    { return s.Pos }
 func (s *ContinueStmt) Position() Pos { return s.Pos }
-func (s *TryStmt) Position() Pos    { return s.Pos }
-func (s *FailStmt) Position() Pos   { return s.Pos }
-func (s *ExitStmt) Position() Pos   { return s.Pos }
-func (s *CmdStmt) Position() Pos    { return s.Pos }
+func (s *TryStmt) Position() Pos      { return s.Pos }
+func (s *FailStmt) Position() Pos     { return s.Pos }
+func (s *ExitStmt) Position() Pos     { return s.Pos }
+func (s *CmdStmt) Position() Pos      { return s.Pos }
 func (s *PipelineStmt) Position() Pos { return s.Pos }
-func (e *RunExpr) Position() Pos    { return e.Pos }
-func (e *Ident) Position() Pos      { return e.Pos }
-func (e *IntLit) Position() Pos     { return e.Pos }
-func (e *FloatLit) Position() Pos   { return e.Pos }
-func (e *StringLit) Position() Pos  { return e.Pos }
-func (e *BoolLit) Position() Pos    { return e.Pos }
-func (e *PrefixExpr) Position() Pos { return e.Pos }
-func (e *InfixExpr) Position() Pos  { return e.Pos }
-func (e *CallExpr) Position() Pos   { return e.Pos }
+func (e *RunExpr) Position() Pos      { return e.Pos }
+func (e *CaptureExpr) Position() Pos  { return e.Pos }
+func (e *Ident) Position() Pos        { return e.Pos }
+func (e *IntLit) Position() Pos       { return e.Pos }
+func (e *FloatLit) Position() Pos     { return e.Pos }
+func (e *StringLit) Position() Pos    { return e.Pos }
+func (e *BoolLit) Position() Pos      { return e.Pos }
+func (e *PrefixExpr) Position() Pos   { return e.Pos }
+func (e *InfixExpr) Position() Pos    { return e.Pos }
+func (e *CallExpr) Position() Pos     { return e.Pos }
 
-func (*ImportStmt) stmtNode() {}
-func (*LetStmt) stmtNode()    {}
-func (*PrintStmt) stmtNode()  {}
-func (*IfStmt) stmtNode()     {}
-func (*FnStmt) stmtNode()     {}
-func (*ReturnStmt) stmtNode() {}
-func (*ExprStmt) stmtNode()   {}
-func (*WhileStmt) stmtNode()  {}
-func (*ForStmt) stmtNode()    {}
-func (*BreakStmt) stmtNode()  {}
+func (*ImportStmt) stmtNode()   {}
+func (*LetStmt) stmtNode()      {}
+func (*PrintStmt) stmtNode()    {}
+func (*IfStmt) stmtNode()       {}
+func (*FnStmt) stmtNode()       {}
+func (*ReturnStmt) stmtNode()   {}
+func (*ExprStmt) stmtNode()     {}
+func (*WhileStmt) stmtNode()    {}
+func (*ForStmt) stmtNode()      {}
+func (*BreakStmt) stmtNode()    {}
 func (*ContinueStmt) stmtNode() {}
-func (*TryStmt) stmtNode()    {}
-func (*FailStmt) stmtNode()   {}
-func (*ExitStmt) stmtNode()   {}
-func (*CmdStmt) stmtNode()    {}
+func (*TryStmt) stmtNode()      {}
+func (*FailStmt) stmtNode()     {}
+func (*ExitStmt) stmtNode()     {}
+func (*CmdStmt) stmtNode()      {}
 func (*PipelineStmt) stmtNode() {}
 
-func (*Ident) exprNode()      {}
-func (*IntLit) exprNode()     {}
-func (*FloatLit) exprNode()   {}
-func (*StringLit) exprNode()  {}
-func (*BoolLit) exprNode()    {}
-func (*PrefixExpr) exprNode() {}
-func (*InfixExpr) exprNode()  {}
-func (*CallExpr) exprNode()   {}
-func (*RunExpr) exprNode()    {}
+func (*Ident) exprNode()       {}
+func (*IntLit) exprNode()      {}
+func (*FloatLit) exprNode()    {}
+func (*StringLit) exprNode()   {}
+func (*BoolLit) exprNode()     {}
+func (*PrefixExpr) exprNode()  {}
+func (*InfixExpr) exprNode()   {}
+func (*CallExpr) exprNode()    {}
+func (*RunExpr) exprNode()     {}
+func (*CaptureExpr) exprNode() {}
