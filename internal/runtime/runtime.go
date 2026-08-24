@@ -171,15 +171,24 @@ func (r *Runtime) emit(e Event) {
 	}
 }
 
-// Run executes every statement in script. A top-level `return` is an error.
+// Run executes every statement in script. A top-level `return`, `break`,
+// or `continue` is an error (the parser rejects break/continue outside
+// loops; this is defense in depth).
 func (r *Runtime) Run(script *ast.Script) *Error {
-	ret, err := r.execBlock(script.Stmts)
+	f, err := r.execBlock(script.Stmts)
 	if err != nil {
 		r.emit(Event{Type: "error", Line: err.Line, Column: err.Column, Text: err.Msg})
 		return err
 	}
-	if ret != nil {
-		return errAt(ret.pos, "return outside function")
+	if f != nil {
+		switch f.kind {
+		case flowBreak:
+			return errAt(f.pos, "break outside loop")
+		case flowContinue:
+			return errAt(f.pos, "continue outside loop")
+		default:
+			return errAt(f.pos, "return outside function")
+		}
 	}
 	return nil
 }
@@ -198,23 +207,34 @@ func (r *Runtime) lookup(name string) (Value, bool) {
 	return nil, false
 }
 
-// returnValue signals `return` unwinding to the nearest enclosing call.
-type returnValue struct {
-	v   Value
-	pos ast.Pos
+// flow signals unwinding through blocks: return to the nearest call,
+// break/continue to the nearest enclosing loop.
+type flowKind int
+
+const (
+	flowNone      flowKind = iota
+	flowReturn
+	flowBreak
+	flowContinue
+)
+
+type flow struct {
+	kind flowKind
+	v    Value   // return payload (flowReturn only)
+	pos  ast.Pos // source position of the triggering statement
 }
 
-func (r *Runtime) execBlock(stmts []ast.Stmt) (*returnValue, *Error) {
+func (r *Runtime) execBlock(stmts []ast.Stmt) (*flow, *Error) {
 	for _, stmt := range stmts {
-		ret, err := r.execStmt(stmt)
-		if err != nil || ret != nil {
-			return ret, err
+		f, err := r.execStmt(stmt)
+		if err != nil || (f != nil && f.kind != flowNone) {
+			return f, err
 		}
 	}
 	return nil, nil
 }
 
-func (r *Runtime) execStmt(stmt ast.Stmt) (*returnValue, *Error) {
+func (r *Runtime) execStmt(stmt ast.Stmt) (*flow, *Error) {
 	switch s := stmt.(type) {
 	case *ast.LetStmt:
 		v, err := r.eval(s.Value)
@@ -257,8 +277,18 @@ func (r *Runtime) execStmt(stmt ast.Stmt) (*returnValue, *Error) {
 			if !Truthy(cond) {
 				return nil, nil
 			}
-			if ret, err := r.execBlock(s.Body); ret != nil || err != nil {
-				return ret, err
+			f, err := r.execBlock(s.Body)
+			if err != nil {
+				return nil, err
+			}
+			switch {
+			case f == nil:
+			case f.kind == flowBreak:
+				return nil, nil
+			case f.kind == flowContinue:
+				continue
+			default:
+				return f, nil // return unwinds past the loop
 			}
 		}
 	case *ast.ForStmt:
@@ -276,11 +306,25 @@ func (r *Runtime) execStmt(stmt ast.Stmt) (*returnValue, *Error) {
 		r.scopes[cur][s.Var] = Bool(false)
 		for _, item := range list {
 			r.scopes[cur][s.Var] = item
-			if ret, err := r.execBlock(s.Body); ret != nil || err != nil {
-				return ret, err
+			f, err := r.execBlock(s.Body)
+			if err != nil {
+				return nil, err
+			}
+			switch {
+			case f == nil:
+			case f.kind == flowBreak:
+				return nil, nil
+			case f.kind == flowContinue:
+				continue
+			default:
+				return f, nil
 			}
 		}
 		return nil, nil
+	case *ast.BreakStmt:
+		return &flow{kind: flowBreak, pos: s.Pos}, nil
+	case *ast.ContinueStmt:
+		return &flow{kind: flowContinue, pos: s.Pos}, nil
 	case *ast.CmdStmt:
 		_, err := r.runCommand(s.Pos, s.Name, s.Args)
 		return nil, err
@@ -294,13 +338,13 @@ func (r *Runtime) execStmt(stmt ast.Stmt) (*returnValue, *Error) {
 		return nil, err
 	case *ast.ReturnStmt:
 		if s.Value == nil {
-			return &returnValue{v: Bool(false), pos: s.Pos}, nil
+			return &flow{kind: flowReturn, v: Bool(false), pos: s.Pos}, nil
 		}
 		v, err := r.eval(s.Value)
 		if err != nil {
 			return nil, err
 		}
-		return &returnValue{v: v, pos: s.Pos}, nil
+		return &flow{kind: flowReturn, v: v, pos: s.Pos}, nil
 	default:
 		return nil, errAt(stmt.Position(), "cannot execute %T", stmt)
 	}
@@ -402,13 +446,20 @@ func (r *Runtime) doImport(s *ast.ImportStmt) *Error {
 	}
 
 	r.loading[resolved] = true
-	ret, rerr := child.execBlock(script.Stmts)
+	f, rerr := child.execBlock(script.Stmts)
 	delete(r.loading, resolved)
 	if rerr != nil {
 		return rerr
 	}
-	if ret != nil {
-		return errAt(ret.pos, "return outside function")
+	if f != nil {
+		switch f.kind {
+		case flowBreak:
+			return errAt(f.pos, "break outside loop")
+		case flowContinue:
+			return errAt(f.pos, "continue outside loop")
+		default:
+			return errAt(f.pos, "return outside function")
+		}
 	}
 
 	mod := &Module{Name: moduleName(resolved), Exports: child.scopes[0]}
@@ -531,10 +582,14 @@ func (r *Runtime) callFunc(n *ast.CallExpr, f *Func, args []Value) (Value, *Erro
 	if err != nil {
 		return nil, err
 	}
-	if ret != nil {
+	switch {
+	case ret == nil:
+		return Bool(false), nil // no explicit return → false (documented)
+	case ret.kind == flowReturn:
 		return ret.v, nil
+	default: // break/continue never cross a fn boundary — loops are reset there
+		return nil, errAt(ret.pos, "break/continue outside loop")
 	}
-	return Bool(false), nil // no explicit return → false (documented)
 }
 
 func (r *Runtime) evalInfix(n *ast.InfixExpr) (Value, *Error) {

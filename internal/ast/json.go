@@ -39,6 +39,8 @@ func (s *ReturnStmt) MarshalJSON() ([]byte, error) { return withKind("return", *
 func (s *ExprStmt) MarshalJSON() ([]byte, error)   { return withKind("expr", *s) }
 func (s *WhileStmt) MarshalJSON() ([]byte, error)  { return withKind("while", *s) }
 func (s *ForStmt) MarshalJSON() ([]byte, error)    { return withKind("for", *s) }
+func (s *BreakStmt) MarshalJSON() ([]byte, error)  { return withKind("break", *s) }
+func (s *ContinueStmt) MarshalJSON() ([]byte, error) { return withKind("continue", *s) }
 func (s *CmdStmt) MarshalJSON() ([]byte, error)    { return withKind("command", *s) }
 func (e *Ident) MarshalJSON() ([]byte, error)      { return withKind("ident", *e) }
 func (e *IntLit) MarshalJSON() ([]byte, error)     { return withKind("int", *e) }

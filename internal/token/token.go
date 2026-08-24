@@ -57,29 +57,33 @@ const (
 	RUN    Type = "run"
 	IMPORT Type = "import"
 	AS     Type = "as"
+	BREAK  Type = "break"
+	CONT   Type = "continue"
 )
 
 var keywords = map[string]Type{
-	"let":    LET,
-	"print":  PRINT,
-	"if":     IF,
-	"then":   THEN,
-	"else":   ELSE,
-	"elif":   ELIF,
-	"run":    RUN,
-	"import": IMPORT,
-	"as":     AS,
-	"end":    END,
-	"fn":     FN,
-	"return": RETURN,
-	"for":    FOR,
-	"in":     IN,
-	"while":  WHILE,
-	"and":    AND,
-	"or":     OR,
-	"not":    NOT,
-	"true":   TRUE,
-	"false":  FALSE,
+	"let":      LET,
+	"print":    PRINT,
+	"if":       IF,
+	"then":     THEN,
+	"else":     ELSE,
+	"elif":     ELIF,
+	"run":      RUN,
+	"import":   IMPORT,
+	"as":       AS,
+	"end":      END,
+	"fn":       FN,
+	"return":   RETURN,
+	"for":      FOR,
+	"in":       IN,
+	"while":    WHILE,
+	"and":      AND,
+	"or":       OR,
+	"not":      NOT,
+	"true":     TRUE,
+	"false":    FALSE,
+	"break":    BREAK,
+	"continue": CONT,
 }
 
 // LookupIdent returns the keyword type for ident, or IDENT if it is not a keyword.

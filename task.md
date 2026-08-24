@@ -92,7 +92,7 @@ a task isn't "done" until its test box is checked, and every phase ends with PLA
 **DW: real automation that needs pipes, file redirects, loop control, and failure recovery
 is easier to write in Nesh than Bash. This is the "I actually use it every day" bar.**
 
-- [ ] T4.1 Loop control: `break`, `continue`
+- [x] T4.1 Loop control: `break`, `continue`
   - DW: unit tests; both work in while + for-in; REPL verified
 - [ ] T4.2 Redirection + stdin passthrough: `ls -la > out.txt`, `>> append`, command reads script stdin
   - DW: integration test writes/reads files via redirection; stdin flows to child process

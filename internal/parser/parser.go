@@ -49,10 +49,11 @@ var precedences = map[token.Type]int{
 }
 
 type parser struct {
-	l    *lexer.Lexer
-	cur  token.Token
-	peek token.Token
-	err  *Error
+	l     *lexer.Lexer
+	cur   token.Token
+	peek  token.Token
+	err   *Error
+	loops int // lexical while/for depth; break/continue need loops > 0
 }
 
 // Parse lexes and parses src into a Script, returning the first parse
@@ -128,6 +129,10 @@ func (p *parser) parseStmt() (ast.Stmt, bool) {
 		return p.parseImport()
 	case token.RETURN:
 		return p.parseReturn()
+	case token.BREAK:
+		return p.parseBreak()
+	case token.CONT:
+		return p.parseContinue()
 	case token.IDENT:
 		if p.peek.Type == token.LPAREN {
 			call, ok := p.parseCall(p.cur.Literal, ast.Pos{Line: p.cur.Line, Column: p.cur.Column})
@@ -181,7 +186,12 @@ func (p *parser) parseFn() (ast.Stmt, bool) {
 	if !p.expect(token.RPAREN) {
 		return nil, false
 	}
+	// A function body executes later, so break/continue inside it never
+	// belong to an enclosing loop — parse it at zero lexical depth.
+	savedLoops := p.loops
+	p.loops = 0
 	body, ok := p.parseBlock(token.END)
+	p.loops = savedLoops
 	if !ok {
 		return nil, false
 	}
@@ -276,6 +286,26 @@ func (p *parser) parseImport() (ast.Stmt, bool) {
 	return &ast.ImportStmt{Pos: pos, Path: path, Alias: alias}, true
 }
 
+func (p *parser) parseBreak() (ast.Stmt, bool) {
+	pos := ast.Pos{Line: p.cur.Line, Column: p.cur.Column}
+	if p.loops == 0 {
+		p.fail("break outside loop — break only works inside while or for")
+		return nil, false
+	}
+	p.next() // consume 'break'
+	return &ast.BreakStmt{Pos: pos}, true
+}
+
+func (p *parser) parseContinue() (ast.Stmt, bool) {
+	pos := ast.Pos{Line: p.cur.Line, Column: p.cur.Column}
+	if p.loops == 0 {
+		p.fail("continue outside loop — continue only works inside while or for")
+		return nil, false
+	}
+	p.next() // consume 'continue'
+	return &ast.ContinueStmt{Pos: pos}, true
+}
+
 func (p *parser) parseWhile() (ast.Stmt, bool) {
 	pos := ast.Pos{Line: p.cur.Line, Column: p.cur.Column}
 	p.next() // consume 'while'
@@ -283,7 +313,9 @@ func (p *parser) parseWhile() (ast.Stmt, bool) {
 	if !ok {
 		return nil, false
 	}
+	p.loops++
 	body, ok := p.parseBlock(token.END)
+	p.loops--
 	if !ok {
 		return nil, false
 	}
@@ -309,7 +341,9 @@ func (p *parser) parseFor() (ast.Stmt, bool) {
 	if !ok {
 		return nil, false
 	}
+	p.loops++
 	body, ok := p.parseBlock(token.END)
+	p.loops--
 	if !ok {
 		return nil, false
 	}

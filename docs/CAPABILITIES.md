@@ -13,8 +13,8 @@
 | Comparisons | `== != < > <= >=` | |
 | Booleans | `and`, `or`, `not`, `true`/`false` | Documented truthiness rules |
 | Conditionals | `if cond then ... elif ... else ... end` | Flat `elif` chains, arbitrary nesting |
-| While loops | `while i < 10 ... end` | |
-| For-in loops | `for x in [1, 2, 3] ... end` | Works over lists and split results |
+| While loops | `while i < 10 ... end` | With `break` / `continue` |
+| For-in loops | `for x in list ... end` | Works over lists and split results; `break` / `continue` supported |
 | Functions | `fn name(args) ... return ... end` | Recursion, calls as expressions or bare statements, lexical scoping |
 | Modules | `import "utils.nsh"` / `import "u.nsh" as u` | Namespaced dotted access, cached by path, cycle detection |
 

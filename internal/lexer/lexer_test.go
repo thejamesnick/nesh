@@ -39,13 +39,14 @@ func assertTokens(t *testing.T, input string, want []tok) {
 }
 
 func TestKeywordsAndIdentifiers(t *testing.T) {
-	assertTokens(t, "let print if then else end fn return for in while",
+	assertTokens(t, "let print if then else end fn return for in while break continue",
 		[]tok{
 			{token.LET, "let"}, {token.PRINT, "print"},
 			{token.IF, "if"}, {token.THEN, "then"},
 			{token.ELSE, "else"}, {token.END, "end"},
 			{token.FN, "fn"}, {token.RETURN, "return"},
 			{token.FOR, "for"}, {token.IN, "in"}, {token.WHILE, "while"},
+			{token.BREAK, "break"}, {token.CONT, "continue"},
 			{token.EOF, ""},
 		})
 	assertTokens(t, "let name = \"John\"",

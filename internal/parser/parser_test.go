@@ -139,3 +139,46 @@ func TestEmptyScript(t *testing.T) {
 		t.Fatalf("empty input should parse to empty script, got %v, %v", s, err)
 	}
 }
+
+func TestBreakContinue(t *testing.T) {
+	s, err := Parse("while true\nbreak\nend\n")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	w := s.Stmts[0].(*ast.WhileStmt)
+	if _, ok := w.Body[0].(*ast.BreakStmt); !ok {
+		t.Fatalf("got %T, want *ast.BreakStmt", w.Body[0])
+	}
+
+	s, err = Parse("for x in items\ncontinue\nend\n")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	f := s.Stmts[0].(*ast.ForStmt)
+	if _, ok := f.Body[0].(*ast.ContinueStmt); !ok {
+		t.Fatalf("got %T, want *ast.ContinueStmt", f.Body[0])
+	}
+}
+
+func TestBreakContinueOutsideLoop(t *testing.T) {
+	cases := []struct {
+		src  string
+		line int
+	}{
+		{"break\n", 1},
+		{"continue\n", 1},
+		{"if true then\nbreak\nend\n", 2},
+		// fn bodies execute later — an enclosing loop must not leak in
+		{"while true\nfn f()\nbreak\nend\nend\n", 3},
+	}
+	for _, c := range cases {
+		_, err := Parse(c.src)
+		if err == nil {
+			t.Errorf("input %q: expected error, got none", c.src)
+			continue
+		}
+		if err.Line != c.line {
+			t.Errorf("input %q: error at line %d, want %d (%s)", c.src, err.Line, c.line, err.Msg)
+		}
+	}
+}

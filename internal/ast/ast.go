@@ -91,6 +91,16 @@ type ForStmt struct {
 	Body []Stmt `json:"body"`
 }
 
+// BreakStmt exits the innermost enclosing while/for loop.
+type BreakStmt struct {
+	Pos Pos `json:"pos"`
+}
+
+// ContinueStmt skips to the next iteration of the innermost enclosing loop.
+type ContinueStmt struct {
+	Pos Pos `json:"pos"`
+}
+
 // ImportStmt is `import "path.nsh" [as alias]`.
 // Without an alias, the module's definitions merge into globals; with one,
 // they are reachable via dotted access (alias.name).
@@ -184,6 +194,8 @@ func (s *ReturnStmt) Position() Pos { return s.Pos }
 func (s *ExprStmt) Position() Pos   { return s.Expr.Position() }
 func (s *WhileStmt) Position() Pos  { return s.Pos }
 func (s *ForStmt) Position() Pos    { return s.Pos }
+func (s *BreakStmt) Position() Pos  { return s.Pos }
+func (s *ContinueStmt) Position() Pos { return s.Pos }
 func (s *CmdStmt) Position() Pos    { return s.Pos }
 func (e *RunExpr) Position() Pos    { return e.Pos }
 func (e *Ident) Position() Pos      { return e.Pos }
@@ -204,6 +216,8 @@ func (*ReturnStmt) stmtNode() {}
 func (*ExprStmt) stmtNode()   {}
 func (*WhileStmt) stmtNode()  {}
 func (*ForStmt) stmtNode()    {}
+func (*BreakStmt) stmtNode()  {}
+func (*ContinueStmt) stmtNode() {}
 func (*CmdStmt) stmtNode()    {}
 
 func (*Ident) exprNode()      {}

@@ -20,7 +20,6 @@ see `task.md` (roadmap) and the Parking Lot for scheduling.*
 
 | Missing | Why it hurts | Status |
 |---|---|---|
-| **`break` / `continue`** | Loop control requires flag-variable workarounds | Documented in T2.5 |
 | **String interpolation** | `"host: " + host` only — no `"...{host}..."` sugar | Not decided |
 | **Maps / dicts** | Only lists exist; keyed data needs parallel lists | Parking lot (structured data) |
 | **JSON literals & parsing** | Can't parse or emit JSON natively; agents/APIs need this badly | Parking lot, after core stable |
