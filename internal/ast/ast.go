@@ -117,6 +117,14 @@ type Redirect struct {
 	Path string `json:"path"`
 }
 
+// CmdStage is one command segment: a bare command, or one stage of a
+// pipeline (`cat log | grep error | wc -l`).
+type CmdStage struct {
+	Name      string     `json:"name"`
+	Args      []string   `json:"args,omitempty"`
+	Redirects []Redirect `json:"redirects,omitempty"`
+}
+
 // CmdStmt is a bare system command: `git status --short`. Words are literal
 // (no variable expansion yet — Phase 3 decision).
 type CmdStmt struct {
@@ -126,13 +134,22 @@ type CmdStmt struct {
 	Redirects []Redirect `json:"redirects,omitempty"`
 }
 
+// PipelineStmt is a chain of commands: each stage's stdout feeds the next
+// stage's stdin; the statement's exit status is the last stage's.
+type PipelineStmt struct {
+	Pos    Pos        `json:"pos"`
+	Stages []CmdStage `json:"stages"`
+}
+
 // RunExpr is `run <command>` in expression position; it evaluates to the
-// command's exit code as an Int.
+// command's exit code as an Int. With `Pipe` stages (`run a | b | c`) it
+// is a pipeline expression and still evaluates to the LAST stage's code.
 type RunExpr struct {
 	Pos       Pos        `json:"pos"`
 	Name      string     `json:"name"`
 	Args      []string   `json:"args,omitempty"`
 	Redirects []Redirect `json:"redirects,omitempty"`
+	Pipe      []CmdStage `json:"pipe,omitempty"`
 }
 
 // Ident is a variable reference.
@@ -206,6 +223,7 @@ func (s *ForStmt) Position() Pos    { return s.Pos }
 func (s *BreakStmt) Position() Pos  { return s.Pos }
 func (s *ContinueStmt) Position() Pos { return s.Pos }
 func (s *CmdStmt) Position() Pos    { return s.Pos }
+func (s *PipelineStmt) Position() Pos { return s.Pos }
 func (e *RunExpr) Position() Pos    { return e.Pos }
 func (e *Ident) Position() Pos      { return e.Pos }
 func (e *IntLit) Position() Pos     { return e.Pos }
@@ -228,6 +246,7 @@ func (*ForStmt) stmtNode()    {}
 func (*BreakStmt) stmtNode()  {}
 func (*ContinueStmt) stmtNode() {}
 func (*CmdStmt) stmtNode()    {}
+func (*PipelineStmt) stmtNode() {}
 
 func (*Ident) exprNode()      {}
 func (*IntLit) exprNode()     {}

@@ -211,3 +211,9 @@ func TestAppendOperator(t *testing.T) {
 			{token.IDENT, "d"}, {token.EOF, ""},
 		})
 }
+
+func TestPipeToken(t *testing.T) {
+	assertTokens(t, "a | b", []tok{
+		{token.IDENT, "a"}, {token.PIPE, "|"}, {token.IDENT, "b"}, {token.EOF, ""},
+	})
+}

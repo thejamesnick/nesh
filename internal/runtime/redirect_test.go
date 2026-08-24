@@ -216,3 +216,116 @@ func TestRealRedirectionEndToEnd(t *testing.T) {
 		t.Fatalf("append content wrong: %q", data)
 	}
 }
+
+func TestPipelineChainsStdoutToStdin(t *testing.T) {
+	rt := New(&fakeOutput{})
+	fr := &fakeRunner{}
+	// "grep" simulates filtering lines containing its arg
+	fr.fn = func(name string, args []string, stdin string, stdout io.Writer) int {
+		switch name {
+		case "gen":
+			fmt.Fprint(stdout, "apple\nbanana\navocado\n")
+			return 0
+		case "pick":
+			for _, line := range strings.Split(strings.TrimSuffix(stdin, "\n"), "\n") {
+				if strings.HasPrefix(line, args[0]) {
+					fmt.Fprintln(stdout, line)
+				}
+			}
+			return 0
+		case "count":
+			fmt.Fprintln(stdout, len(strings.Split(strings.TrimSpace(stdin), "\n")))
+			return 0
+		}
+		return 127
+	}
+	rt.SetRunner(fr)
+
+	script, perr := parser.Parse("gen | pick av | count\n")
+	if perr != nil {
+		t.Fatalf("parse error: %v", perr)
+	}
+	out := &fakeOutput{}
+	rt.out = out
+	if rerr := rt.Run(script); rerr != nil {
+		t.Fatalf("runtime error: %v", rerr)
+	}
+	if got := out.b.String(); got != "1\n" {
+		t.Fatalf("pipeline produced %q, want \"1\\n\"", got)
+	}
+}
+
+func TestRunPipelineExitCodeIsLastStage(t *testing.T) {
+	rt := New(&fakeOutput{})
+	fr := &fakeRunner{code: 0}
+	fr.fn = func(name string, args []string, stdin string, stdout io.Writer) int {
+		switch name {
+		case "ok":
+			fmt.Fprintln(stdout, "data")
+			return 0
+		case "fail":
+			return 3
+		}
+		return 0
+	}
+	rt.SetRunner(fr)
+
+	script, perr := parser.Parse("let n = run ok | fail\nprint n\n")
+	if perr != nil {
+		t.Fatalf("parse error: %v", perr)
+	}
+	out := &fakeOutput{}
+	rt.out = out
+	if rerr := rt.Run(script); rerr != nil {
+		t.Fatalf("runtime error: %v", rerr)
+	}
+	if got := out.b.String(); got != "3\n" {
+		t.Fatalf("exit code capture got %q, want \"3\\n\"", got)
+	}
+}
+
+func TestRealPipelineEndToEnd(t *testing.T) {
+	dir := t.TempDir()
+	logPath := filepath.Join(dir, "app.log")
+	if err := os.WriteFile(logPath, []byte("INFO boot\nERROR db down\nINFO ready\nERROR timeout\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	build := func(src string) (*Runtime, *fakeOutput) {
+		out := &fakeOutput{}
+		rt := New(out)
+		rt.SetRunner(shell.RealRunner{})
+		rt.SetFileSystem(shell.RealFS{})
+		return rt, out
+	}
+
+	// file feeds grep via <, then streams into wc: real processes
+	// connected through io.Pipe
+	src := "grep ERROR < \"" + logPath + "\" | wc -l\n"
+	rt, out := build(src)
+	if rerr := rt.Run(mustScript(t, src)); rerr != nil {
+		t.Fatalf("pipeline failed: %v", rerr)
+	}
+	if got := strings.TrimSpace(out.b.String()); got != "2" {
+		t.Fatalf("got %q, want 2", got)
+	}
+
+	// pipeline as an expression captures the last stage's code
+	src = "let n = run printf \"a\\nb\\nc\\n\" | wc -l\nprint n\n"
+	rt, out = build(src)
+	if rerr := rt.Run(mustScript(t, src)); rerr != nil {
+		t.Fatalf("run pipeline failed: %v", rerr)
+	}
+	if got := strings.TrimSpace(out.b.String()); !strings.Contains(got, "3") {
+		t.Fatalf("got %q, want line count 3", got)
+	}
+}
+
+func mustScript(t *testing.T, src string) *ast.Script {
+	t.Helper()
+	s, perr := parser.Parse(src)
+	if perr != nil {
+		t.Fatalf("parse error for %q: %v", src, perr)
+	}
+	return s
+}

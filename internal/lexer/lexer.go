@@ -212,6 +212,8 @@ func (l *Lexer) readOperator() (token.Type, string) {
 		return token.ASTERISK, "*"
 	case '/':
 		return token.SLASH, "/"
+	case '|':
+		return token.PIPE, "|"
 	case '(':
 		return token.LPAREN, "("
 	case ')':

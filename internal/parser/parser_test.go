@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"strings"
 	"testing"
 
 	"nesh/internal/ast"
@@ -233,6 +234,59 @@ func TestRedirectErrors(t *testing.T) {
 		}
 		if err.Column != c.col {
 			t.Errorf("input %q: error at col %d, want %d (%s)", c.src, err.Column, c.col, err.Msg)
+		}
+	}
+}
+
+func TestPipeline(t *testing.T) {
+	s, err := Parse("cat log.txt | grep error | wc -l\n")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	pl := s.Stmts[0].(*ast.PipelineStmt)
+	if len(pl.Stages) != 3 {
+		t.Fatalf("got %d stages, want 3", len(pl.Stages))
+	}
+	wantNames := []string{"cat", "grep", "wc"}
+	wantArgs := [][]string{{"log.txt"}, {"error"}, {"-l"}}
+	for i, st := range pl.Stages {
+		if st.Name != wantNames[i] {
+			t.Errorf("stage %d name: got %q, want %q", i, st.Name, wantNames[i])
+		}
+		if strings.Join(st.Args, ",") != strings.Join(wantArgs[i], ",") {
+			t.Errorf("stage %d args: got %v, want %v", i, st.Args, wantArgs[i])
+		}
+	}
+
+	// run expression with pipe stages
+	s, err = Parse("let n = run git log | grep fix | wc -l\n")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	runE := ((s.Stmts[0].(*ast.LetStmt)).Value).(*ast.RunExpr)
+	if runE.Name != "git" || len(runE.Pipe) != 2 || runE.Pipe[1].Name != "wc" {
+		t.Fatalf("run pipeline wrong: %+v", runE)
+	}
+
+	// redirects mix with pipes per stage
+	s, err = Parse("git log > all.txt | grep fix < errs.txt\n")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	pl = s.Stmts[0].(*ast.PipelineStmt)
+	if len(pl.Stages[0].Redirects) != 1 || pl.Stages[0].Redirects[0].Op != ">" {
+		t.Fatalf("stage 0 redirects: %+v", pl.Stages[0].Redirects)
+	}
+	if len(pl.Stages[1].Redirects) != 1 || pl.Stages[1].Redirects[0].Op != "<" {
+		t.Fatalf("stage 1 redirects: %+v", pl.Stages[1].Redirects)
+	}
+}
+
+func TestPipelineErrors(t *testing.T) {
+	for _, src := range []string{"git log |\n", "a | | b\n"} {
+		_, err := Parse(src)
+		if err == nil {
+			t.Errorf("input %q: expected error, got none", src)
 		}
 	}
 }

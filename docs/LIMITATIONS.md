@@ -10,7 +10,7 @@ see `task.md` (roadmap) and the Parking Lot for scheduling.*
 
 | Missing | Why it hurts | Status |
 |---|---|---|
-| **Pipelines (`\|`)** | Can't do `cat log \| grep error` — the Unix composability habit | **T4.3 — next up** |
+| **Structured pipelines** (`\| filter user.active`) | Text pipelines only — no structured-data stages yet | Parking lot, after text pipelines prove out |
 | **Globbing** (`*.txt`) | Wildcards pass through literally to commands | Not started |
 
 ## Language Gaps

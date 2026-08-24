@@ -97,8 +97,9 @@ is easier to write in Nesh than Bash. This is the "I actually use it every day" 
 - [x] T4.2 Redirection + stdin passthrough: `ls -la > out.txt`, `>> append`, command reads script stdin
   - DW: integration test writes/reads files via redirection; stdin flows to child process
   - Note: absolute paths in redirects must be quoted (`> "/var/log/x"`) — a leading `/` lexes as division otherwise
-- [ ] T4.3 Text pipelines: `cat log | grep error | wc -l`
+- [x] T4.3 Text pipelines: `cat log | grep error | wc -l`
   - DW: `|` chains system commands, stdout→stdin, exit code = last command; spec section added
+  - Also works in `run` expressions: `let n = run printf ... | wc -l`; stages run concurrently via io.Pipe
 - [ ] T4.4 Error handling v1: `try ... on failure ... end`; commands don't abort script by default
   - DW: failing command inside try jumps to handler; runtime errors still abort; tests
 - [ ] T4.5 Dogfooding gate: rewrite 3 scripts you actually use today in `.nsh` — fix whatever hurts

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"testing"
 
 	"nesh/internal/parser"
@@ -314,12 +315,16 @@ func TestFunctionErrors(t *testing.T) {
 
 // fakeRunner records commands instead of touching the OS.
 type fakeRunner struct {
+	mu    sync.Mutex
 	calls []struct {
 		name  string
 		args  []string
 		stdin string
 	}
 	code int
+	// fn, when set, fully simulates a command: it receives the stdin the
+	// runtime handed us and writes its own stdout.
+	fn func(name string, args []string, stdin string, stdout io.Writer) int
 }
 
 func (f *fakeRunner) Run(name string, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -327,12 +332,25 @@ func (f *fakeRunner) Run(name string, args []string, stdin io.Reader, stdout, st
 	if stdin != nil {
 		b, _ = io.ReadAll(stdin)
 	}
+	if f.fn != nil {
+		code := f.fn(name, args, string(b), stdout)
+		f.mu.Lock()
+		f.calls = append(f.calls, struct {
+			name  string
+			args  []string
+			stdin string
+		}{name, args, string(b)})
+		f.mu.Unlock()
+		return code
+	}
+	fmt.Fprintln(stdout, "ran:", name)
+	f.mu.Lock()
 	f.calls = append(f.calls, struct {
 		name  string
 		args  []string
 		stdin string
 	}{name, args, string(b)})
-	fmt.Fprintln(stdout, "ran:", name)
+	f.mu.Unlock()
 	return f.code
 }
 

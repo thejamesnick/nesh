@@ -30,7 +30,9 @@
 | Feed a file to stdin | `wc -l < access.log` |
 | Stdin passthrough | commands read the script's own stdin when no `<` redirect is given |
 
-Redirect paths with absolute locations need quoting: `> "/var/log/app.log"`.
+| Redirect paths with absolute locations need quoting: `> "/var/log/app.log"`. |
+| Pipelines | `cat log \| grep error \| wc -l` | stdout→stdin between stages, concurrent like a shell; exit status = last stage |
+| Pipeline capture | `let n = run git log \| grep fix \| wc -l` | `run` evaluates to the last stage's exit code |
 
 ## Standard Library
 

@@ -204,26 +204,58 @@ func (p *parser) parseFn() (ast.Stmt, bool) {
 // parseCmdPhrase parses a bare command: `git commit -m "msg"`.
 // cur is the command-name token. Words are literals; leading dashes merge
 // into flags (`-m`, `--force`) because the lexer splits them.
+// With `|`, returns a PipelineStmt instead of a CmdStmt.
 func (p *parser) parseCmdPhrase(name string) (ast.Stmt, bool) {
 	pos := ast.Pos{Line: p.cur.Line, Column: p.cur.Column}
 	p.next() // consume the name
-	stmt := &ast.CmdStmt{Pos: pos, Name: name}
+	first := &ast.CmdStage{Name: name}
+	if !p.parseStageTail(first, true) {
+		return nil, false
+	}
+	if !p.at(token.PIPE) {
+		return &ast.CmdStmt{Pos: pos, Name: first.Name, Args: first.Args, Redirects: first.Redirects}, true
+	}
+
+	stages := []ast.CmdStage{*first}
+	for p.at(token.PIPE) {
+		p.next() // consume '|'
+		if !p.at(token.IDENT) {
+			p.fail("expected command after |, got %q", p.cur.Literal)
+			return nil, false
+		}
+		stage := &ast.CmdStage{Name: p.cur.Literal}
+		p.next()
+		if !p.parseStageTail(stage, true) {
+			return nil, false
+		}
+		stages = append(stages, *stage)
+	}
+	return &ast.PipelineStmt{Pos: pos, Stages: stages}, true
+}
+
+// parseStageTail parses words and redirects into st until a statement
+// boundary (stopping early at '|' when stopAtPipe is set). cur is the
+// token right after the command name.
+func (p *parser) parseStageTail(st *ast.CmdStage, stopAtPipe bool) bool {
 	for !p.atStatementBoundary() {
+		if stopAtPipe && p.at(token.PIPE) {
+			return true
+		}
 		if p.atRedirect() {
 			redir, ok := p.parseRedirect()
 			if !ok {
-				return nil, false
+				return false
 			}
-			stmt.Redirects = append(stmt.Redirects, redir)
+			st.Redirects = append(st.Redirects, redir)
 			continue
 		}
 		word, ok := p.parseCmdWord()
 		if !ok {
-			return nil, false
+			return false
 		}
-		stmt.Args = append(stmt.Args, word)
+		st.Args = append(st.Args, word)
 	}
-	return stmt, true
+	return true
 }
 
 // atRedirect reports whether cur starts a redirection (> >> <).
@@ -251,6 +283,7 @@ func (p *parser) parseRedirect() (ast.Redirect, bool) {
 }
 
 // parseRunExpr parses `run <command>` in expression position.
+// With `|`, the extra stages land in RunExpr.Pipe.
 func (p *parser) parseRunExpr() (ast.Expr, bool) {
 	pos := ast.Pos{Line: p.cur.Line, Column: p.cur.Column}
 	p.next() // consume 'run'
@@ -258,23 +291,24 @@ func (p *parser) parseRunExpr() (ast.Expr, bool) {
 		p.fail("expected command name after run, got %q", p.cur.Literal)
 		return nil, false
 	}
-	name := p.cur.Literal
+	first := &ast.CmdStage{Name: p.cur.Literal}
 	p.next()
-	expr := &ast.RunExpr{Pos: pos, Name: name}
-	for !p.atStatementBoundary() {
-		if p.atRedirect() {
-			redir, ok := p.parseRedirect()
-			if !ok {
-				return nil, false
-			}
-			expr.Redirects = append(expr.Redirects, redir)
-			continue
-		}
-		word, ok := p.parseCmdWord()
-		if !ok {
+	if !p.parseStageTail(first, true) {
+		return nil, false
+	}
+	expr := &ast.RunExpr{Pos: pos, Name: first.Name, Args: first.Args, Redirects: first.Redirects}
+	for p.at(token.PIPE) {
+		p.next() // consume '|'
+		if !p.at(token.IDENT) {
+			p.fail("expected command after |, got %q", p.cur.Literal)
 			return nil, false
 		}
-		expr.Args = append(expr.Args, word)
+		stage := &ast.CmdStage{Name: p.cur.Literal}
+		p.next()
+		if !p.parseStageTail(stage, true) {
+			return nil, false
+		}
+		expr.Pipe = append(expr.Pipe, *stage)
 	}
 	return expr, true
 }

@@ -34,6 +34,7 @@ const (
 	LPAREN  Type = "("
 	RPAREN  Type = ")"
 	COMMA   Type = ","
+	PIPE    Type = "|"
 	NEWLINE Type = "NEWLINE"
 	EOF     Type = "EOF"
 

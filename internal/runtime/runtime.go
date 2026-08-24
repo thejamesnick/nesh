@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"nesh/internal/ast"
 	"nesh/internal/parser"
@@ -118,6 +119,7 @@ func Truthy(v Value) bool {
 type Runtime struct {
 	out      Output
 	stdin    io.Reader // source for child-process stdin (nil = none)
+	mu       sync.Mutex
 	scopes   []map[string]Value
 	runner   shell.CommandRunner
 	events   func(Event)
@@ -331,8 +333,11 @@ func (r *Runtime) execStmt(stmt ast.Stmt) (*flow, *Error) {
 		return &flow{kind: flowBreak, pos: s.Pos}, nil
 	case *ast.ContinueStmt:
 		return &flow{kind: flowContinue, pos: s.Pos}, nil
+	case *ast.PipelineStmt:
+		_, err := r.runCommand(s.Pos, s.Stages[0].Name, s.Stages[0].Args, s.Stages[0].Redirects, s.Stages[1:])
+		return nil, err
 	case *ast.CmdStmt:
-		_, err := r.runCommand(s.Pos, s.Name, s.Args, s.Redirects)
+		_, err := r.runCommand(s.Pos, s.Name, s.Args, s.Redirects, nil)
 		return nil, err
 	case *ast.ImportStmt:
 		return nil, r.doImport(s)
@@ -377,7 +382,7 @@ func (r *Runtime) eval(e ast.Expr) (Value, *Error) {
 	case *ast.CallExpr:
 		return r.call(n)
 	case *ast.RunExpr:
-		code, err := r.runCommand(n.Pos, n.Name, n.Args, n.Redirects)
+		code, err := r.runCommand(n.Pos, n.Name, n.Args, n.Redirects, n.Pipe)
 		if err != nil {
 			return nil, err
 		}
@@ -497,37 +502,66 @@ type outputWriter struct{ o Output }
 
 func (w outputWriter) Write(p []byte) (int, error) { return w.o.WriteString(string(p)) }
 
-// runCommand executes a system command through the injected runner,
-// applying redirections: `>` write, `>>` append, `<` read stdin.
-func (r *Runtime) runCommand(pos ast.Pos, name string, args []string, redirects []ast.Redirect) (int, *Error) {
+// runCommand executes one command or a pipeline through the injected
+// runner, applying redirections: `>` write, `>>` append, `<` read stdin.
+// Each non-final stage's stdout streams into the next stage's stdin
+// (concurrently, like a shell); the returned code is the LAST stage's.
+func (r *Runtime) runCommand(pos ast.Pos, name string, args []string, redirects []ast.Redirect, pipe []ast.CmdStage) (int, *Error) {
 	if r.runner == nil {
 		return 0, errAt(pos, "system commands are not available here")
 	}
-	if v, ok := r.lookup(name); ok {
-		if _, isFn := v.(*Func); !isFn {
-			return 0, errAt(pos, "%s is a variable, not a command — did you mean print %s?", name, name)
+	stages := make([]ast.CmdStage, 0, len(pipe)+1)
+	first := ast.CmdStage{Name: name, Args: args, Redirects: redirects}
+	stages = append(stages, first)
+	stages = append(stages, pipe...)
+	for _, st := range stages {
+		if v, ok := r.lookup(st.Name); ok {
+			if _, isFn := v.(*Func); !isFn {
+				return 0, errAt(pos, "%s is a variable, not a command — did you mean print %s?", st.Name, st.Name)
+			}
 		}
 	}
 
-	var stdin io.Reader = r.stdin
-	var stdout io.Writer = outputWriter{r.out}
-	var closers []io.Closer
-	defer func() {
-		for _, c := range closers {
-			c.Close()
+	var opener shell.Opener
+	needOpener := len(redirects) > 0
+	for _, st := range pipe {
+		if len(st.Redirects) > 0 {
+			needOpener = true
 		}
-	}()
-
-	if len(redirects) > 0 {
-		opener, hasOpener := r.fs.(shell.Opener)
+	}
+	if needOpener {
+		var hasOpener bool
+		opener, hasOpener = r.fs.(shell.Opener)
 		if !hasOpener {
 			return 0, errAt(pos, "redirection needs filesystem access — not available here")
 		}
-		for _, rd := range redirects {
+	}
+
+	// Stages run concurrently and share the output sink; lock writes so
+	// stderr lines (and events) don't interleave mid-write.
+	var mu sync.Mutex
+	stderrW := lockedWriter{&mu, outputWriter{r.out}}
+
+	n := len(stages)
+	codes := make([]int, n)
+	var nextStdin io.Reader = r.stdin
+	// Pipe readers are closed by THIS function after the last stage
+	// finishes — closing them in the producer would race a slow-starting
+	// consumer and fail its reads.
+	var pipeReaders []io.Closer
+
+	for i := range stages {
+		st := stages[i]
+		stdin := nextStdin
+		var stdout io.Writer = io.Writer(stderrW)
+		var closers []io.Closer
+
+		for _, rd := range st.Redirects {
 			switch rd.Op {
 			case "<":
 				f, err := opener.OpenRead(rd.Path)
 				if err != nil {
+					closeAll(closers)
 					return 0, errAt(pos, "cannot read %s: %v", rd.Path, err)
 				}
 				stdin = f
@@ -535,6 +569,7 @@ func (r *Runtime) runCommand(pos ast.Pos, name string, args []string, redirects 
 			case ">":
 				f, err := opener.OpenWrite(rd.Path, false)
 				if err != nil {
+					closeAll(closers)
 					return 0, errAt(pos, "cannot write %s: %v", rd.Path, err)
 				}
 				stdout = f
@@ -542,17 +577,74 @@ func (r *Runtime) runCommand(pos ast.Pos, name string, args []string, redirects 
 			case ">>":
 				f, err := opener.OpenWrite(rd.Path, true)
 				if err != nil {
+					closeAll(closers)
 					return 0, errAt(pos, "cannot append to %s: %v", rd.Path, err)
 				}
 				stdout = f
 				closers = append(closers, f)
 			}
 		}
+
+		if i == n-1 {
+			codes[i] = r.runner.Run(st.Name, st.Args, stdin, stdout, stderrW)
+			closeAll(closers)
+			r.mu.Lock()
+			r.emit(Event{Type: "command", Line: pos.Line, Column: pos.Column, Name: st.Name, Args: st.Args, Code: codes[i]})
+			r.mu.Unlock()
+			break
+		}
+
+		// Non-final stage: stream stdout into the next stage's stdin,
+		// unless an explicit > / >> redirect already claimed stdout.
+		pr, pw := io.Pipe()
+		nextStdin = pr
+		pipeReaders = append(pipeReaders, pr)
+		if !claimsStdout(st) {
+			stdout = pw
+			closers = append(closers, pw)
+		} else {
+			pw.Close() // downstream sees EOF immediately
+		}
+		r.mu.Lock()
+		r.emit(Event{Type: "command", Line: pos.Line, Column: pos.Column, Name: st.Name, Args: st.Args})
+		r.mu.Unlock()
+		go func(i int, st ast.CmdStage, stdin io.Reader, stdout io.Writer, closers []io.Closer) {
+			defer closeAll(closers) // pw closes here → consumer sees EOF
+			codes[i] = r.runner.Run(st.Name, st.Args, stdin, stdout, stderrW)
+		}(i, st, stdin, stdout, closers)
 	}
 
-	code := r.runner.Run(name, args, stdin, stdout, stdout)
-	r.emit(Event{Type: "command", Line: pos.Line, Column: pos.Column, Name: name, Args: args, Code: code})
+	code := codes[n-1]
+	closeAll(pipeReaders)
 	return code, nil
+}
+
+// claimsStdout reports whether redirects include > or >>.
+func claimsStdout(st ast.CmdStage) bool {
+	for _, rd := range st.Redirects {
+		if rd.Op == ">" || rd.Op == ">>" {
+			return true
+		}
+	}
+	return false
+}
+
+func closeAll(cs []io.Closer) {
+	for _, c := range cs {
+		c.Close()
+	}
+}
+
+// lockedWriter serializes writes shared across pipeline goroutines.
+type lockedWriter struct {
+	mu *sync.Mutex
+	w  io.Writer
+}
+
+func (l lockedWriter) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.w.Write(p)
 }
 
 // resolveDotted evaluates `alias.name` against an imported module.
