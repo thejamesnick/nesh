@@ -23,7 +23,7 @@ a task isn't "done" until its test box is checked, and every phase ends with PLA
 | Agent API (`nesh --json`) | ✅ kind-tagged AST + execution events |
 | Benchmarks | ✅ beats bash in all categories; memory profiled |
 
-**Next phase: Phase 4 — Ecosystem (pkg manager, cross-platform CI, v1.0)**
+**Next phase: Phase 4 — Daily Usability (break/continue, redirection, pipelines, error handling, dogfooding) → Phase 5 — Share With The World (pkg manager, CI builds, docs, v1.0)**
 
 ---
 
@@ -87,24 +87,45 @@ a task isn't "done" until its test box is checked, and every phase ends with PLA
 
 ---
 
-## Phase 4 — Ecosystem · target Oct 19, 2026
+## Phase 4 — Daily Usability · target Oct 5, 2026
 
-**DW: installable, cross-platform, beats Bash in ≥70% of benchmark categories, package manager works.**
+**DW: real automation that needs pipes, file redirects, loop control, and failure recovery
+is easier to write in Nesh than Bash. This is the "I actually use it every day" bar.**
 
-- [ ] T4.1 Benchmark suite final: startup, loops, vars, pipelines, control flow, fns, strings, math, file I/O vs bash/dash/zsh (hyperfine)
-- [ ] T4.2 Profile hot paths (pprof); optimize (sync.Pool, interning, buffered I/O); document any Rust/C interop decision — only with profiling proof
-- [ ] T4.3 `nesh pkg install/run` — minimal registry = git URLs
-- [ ] T4.4 Cross-platform builds (macOS, Linux, Windows) in CI (GitHub Actions) + regression benchmarks
-- [ ] T4.5 Docs: user guide, syntax reference, examples that all run
-- [ ] T4.6 Real-world dogfooding: write 5 genuine automation scripts in Nesh, fix what hurts
-- [ ] T4.7 Launch polish, tag `v1.0.0`
+- [ ] T4.1 Loop control: `break`, `continue`
+  - DW: unit tests; both work in while + for-in; REPL verified
+- [ ] T4.2 Redirection + stdin passthrough: `ls -la > out.txt`, `>> append`, command reads script stdin
+  - DW: integration test writes/reads files via redirection; stdin flows to child process
+- [ ] T4.3 Text pipelines: `cat log | grep error | wc -l`
+  - DW: `|` chains system commands, stdout→stdin, exit code = last command; spec section added
+- [ ] T4.4 Error handling v1: `try ... on failure ... end`; commands don't abort script by default
+  - DW: failing command inside try jumps to handler; runtime errors still abort; tests
+- [ ] T4.5 Dogfooding gate: rewrite 3 scripts you actually use today in `.nsh` — fix whatever hurts
+  - DW: 3 genuine personal automation scripts run daily without bash fallback
+- [ ] T4.6 Phase close-out: benchmarks incl. pipeline category vs bash/dash/zsh, docs updated, tag `v0.4.0`
+
+---
+
+## Phase 5 — Share With The World · target Oct 26, 2026
+
+**DW: a stranger can install Nesh on macOS/Linux/Windows and run someone else's package.**
+
+- [ ] T5.1 Profile hot paths (pprof); optimize only with profiling proof (sync.Pool, interning, buffered I/O)
+- [ ] T5.2 `nesh pkg install/run` — minimal registry = git URLs
+  - DW: install from a git URL, run its entry script; version pinning decided
+- [ ] T5.3 Cross-platform builds (macOS, Linux, Windows) in GitHub Actions CI + regression benchmarks
+  - DW: green CI matrix, release binaries downloadable
+- [ ] T5.4 Docs: user guide, syntax reference, examples that all run
+  - DW: docs/CAPABILITIES.md examples + guide cover 100% of shipped syntax
+- [ ] T5.5 Launch polish, tag `v1.0.0`
 
 ---
 
 ## Parking Lot (explicitly NOT now)
 
-- Structured data / JSON literals, `fetch` — after Phase 3 core is stable
-- `parallel:` blocks, `retry n:`, `task/depends_on` graphs — Phase 5+, needs concurrency design doc first
+- Maps/dicts, JSON literals, `fetch` — after Phase 4 usability core is stable
+- Structured pipelines (`| filter user.active`) — after text pipelines prove out (T4.3)
+- `parallel:` blocks, `retry n:`, `task/depends_on` graphs — Phase 6+, needs concurrency design doc first
 - Secrets management, remote execution — post-1.0
 - Windows-first anything — we are Unix-first, Windows is a build target only
 
