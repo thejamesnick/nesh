@@ -106,7 +106,7 @@ is easier to write in Nesh than Bash. This is the "I actually use it every day" 
 - [~] T4.5 Dogfooding gate: rewrite 3 scripts you actually use today in `.nsh` — fix whatever hurts
   - DW: 3 genuine personal automation scripts run daily without bash fallback
 - [~] T4.6 Phase close-out: benchmarks incl. pipeline category vs bash/dash/zsh, docs updated, tag `v0.4.0`
-  - Benchmarks done → benchmarks/results/v0.4.0.md (nesh fastest in 4/7; redirect loss = missing printf-class builtins, documented). Tag waits on T4.5.
+  - Benchmarks done → benchmarks/results/v0.4.0.md (nesh fastest in 4/7). Redirect category flipped from 4.2x loss to a win via native printf/echo command builtins. Startup profiling deferred to Phase 5. Tag waits on T4.5.
 
 ---
 
