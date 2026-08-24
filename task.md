@@ -100,8 +100,9 @@ is easier to write in Nesh than Bash. This is the "I actually use it every day" 
 - [x] T4.3 Text pipelines: `cat log | grep error | wc -l`
   - DW: `|` chains system commands, stdout→stdin, exit code = last command; spec section added
   - Also works in `run` expressions: `let n = run printf ... | wc -l`; stages run concurrently via io.Pipe
-- [ ] T4.4 Error handling v1: `try ... on failure ... end`; commands don't abort script by default
+- [x] T4.4 Error handling v1: `try ... on failure ... end`; commands don't abort script by default
   - DW: failing command inside try jumps to handler; runtime errors still abort; tests
+  - Semantics: `fail ["msg"]` raises a catchable failure (crosses fn boundaries); handler sees the `failure` variable; bare `try` swallows; hard runtime errors are NOT catchable — bugs abort loudly
 - [ ] T4.5 Dogfooding gate: rewrite 3 scripts you actually use today in `.nsh` — fix whatever hurts
   - DW: 3 genuine personal automation scripts run daily without bash fallback
 - [ ] T4.6 Phase close-out: benchmarks incl. pipeline category vs bash/dash/zsh, docs updated, tag `v0.4.0`

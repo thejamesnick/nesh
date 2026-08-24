@@ -290,3 +290,66 @@ func TestPipelineErrors(t *testing.T) {
 		}
 	}
 }
+
+func TestTryOnFailure(t *testing.T) {
+	s, err := Parse("try\ndeploy\non failure\nprint failure\nend\n")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	tr := s.Stmts[0].(*ast.TryStmt)
+	if len(tr.Try) != 1 || !tr.HasOn || len(tr.On) != 1 {
+		t.Fatalf("shape wrong: %+v", tr)
+	}
+
+	// handler optional
+	s, err = Parse("try\nrisky\nend\nprint \"after\"\n")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok := s.Stmts[0].(*ast.TryStmt); !ok {
+		t.Fatalf("got %T, want TryStmt", s.Stmts[0])
+	}
+	if len(s.Stmts) != 2 {
+		t.Fatalf("statement after try lost")
+	}
+
+	for _, src := range []string{
+		"try\nx\non boom\nend\n",  // wrong word after on
+		"try\nx\non failure\n",    // missing end
+	} {
+		if _, err := Parse(src); err == nil {
+			t.Errorf("input %q: expected error, got none", src)
+		}
+	}
+}
+
+func TestFailStatement(t *testing.T) {
+	s, err := Parse("fail \"db down\"\n")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fl := s.Stmts[0].(*ast.FailStmt)
+	if fl.Msg == nil {
+		t.Fatal("message lost")
+	}
+
+	// bare fail parses too
+	if _, err := Parse("fail\n"); err != nil {
+		t.Fatalf("bare fail: %v", err)
+	}
+}
+
+func TestOpenBlocksCountsTry(t *testing.T) {
+	if got := OpenBlocks("try\nx = 1\n"); got != 1 {
+		t.Fatalf("open try: got %d, want 1", got)
+	}
+	if got := OpenBlocks("try\nif true then\ny = 2\nend\n"); got != 1 {
+		t.Fatalf("try+if closed once: got %d, want 1", got)
+	}
+	if got := OpenBlocks("try\nif true then\ny = 2\nend\nend\n"); got != 0 {
+		t.Fatalf("fully closed: got %d, want 0", got)
+	}
+	if got := OpenBlocks("try\nx\non failure\ny\nend\n"); got != 0 {
+		t.Fatalf("closed try: got %d, want 0", got)
+	}
+}

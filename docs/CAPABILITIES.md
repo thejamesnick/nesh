@@ -33,6 +33,26 @@
 | Redirect paths with absolute locations need quoting: `> "/var/log/app.log"`. |
 | Pipelines | `cat log \| grep error \| wc -l` | stdout→stdin between stages, concurrent like a shell; exit status = last stage |
 | Pipeline capture | `let n = run git log \| grep fix \| wc -l` | `run` evaluates to the last stage's exit code |
+| Error handling | `try ... on failure ... end` | `fail ["msg"]` raises; handler reads the `failure` variable; bare `try` swallows; failures cross function boundaries |
+
+## Error Model
+
+- **Failures** (catchable): raised by the explicit `fail` statement. Catch them with `try / on failure`.
+- **Errors** (not catchable): bugs like division by zero or undefined variables. They always abort with line:col — loud by design.
+- Command exit codes never abort scripts. Capture with `run` and decide:
+
+```nesh
+let code = run tests
+if code != 0 then
+  fail "tests broke"
+end
+
+try
+  deploy("prod")
+on failure
+  print "rolled back:" failure
+end
+```
 
 ## Standard Library
 

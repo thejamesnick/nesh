@@ -101,6 +101,24 @@ type ContinueStmt struct {
 	Pos Pos `json:"pos"`
 }
 
+// TryStmt is `try ... [on failure ...] end`. Runtime errors and `fail`
+// statements inside the try block jump to the on-failure block, where the
+// `failure` variable holds the message. Without a handler, failures are
+// swallowed and execution continues after `end`.
+type TryStmt struct {
+	Pos      Pos    `json:"pos"`
+	Try      []Stmt `json:"try"`
+	On       []Stmt `json:"on,omitempty"` // present when HasOn
+	HasOn    bool   `json:"has_on"`
+}
+
+// FailStmt is `fail ["message"]` — raises a catchable failure. Without a
+// message the failure is "failed".
+type FailStmt struct {
+	Pos Pos  `json:"pos"`
+	Msg Expr `json:"msg,omitempty"`
+}
+
 // ImportStmt is `import "path.nsh" [as alias]`.
 // Without an alias, the module's definitions merge into globals; with one,
 // they are reachable via dotted access (alias.name).
@@ -222,6 +240,8 @@ func (s *WhileStmt) Position() Pos  { return s.Pos }
 func (s *ForStmt) Position() Pos    { return s.Pos }
 func (s *BreakStmt) Position() Pos  { return s.Pos }
 func (s *ContinueStmt) Position() Pos { return s.Pos }
+func (s *TryStmt) Position() Pos    { return s.Pos }
+func (s *FailStmt) Position() Pos   { return s.Pos }
 func (s *CmdStmt) Position() Pos    { return s.Pos }
 func (s *PipelineStmt) Position() Pos { return s.Pos }
 func (e *RunExpr) Position() Pos    { return e.Pos }
@@ -245,6 +265,8 @@ func (*WhileStmt) stmtNode()  {}
 func (*ForStmt) stmtNode()    {}
 func (*BreakStmt) stmtNode()  {}
 func (*ContinueStmt) stmtNode() {}
+func (*TryStmt) stmtNode()    {}
+func (*FailStmt) stmtNode()   {}
 func (*CmdStmt) stmtNode()    {}
 func (*PipelineStmt) stmtNode() {}
 

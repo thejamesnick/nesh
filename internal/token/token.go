@@ -61,6 +61,9 @@ const (
 	AS     Type = "as"
 	BREAK  Type = "break"
 	CONT   Type = "continue"
+	TRY    Type = "try"
+	ON     Type = "on"
+	FAIL   Type = "fail"
 )
 
 var keywords = map[string]Type{
@@ -86,6 +89,9 @@ var keywords = map[string]Type{
 	"false":    FALSE,
 	"break":    BREAK,
 	"continue": CONT,
+	"try":      TRY,
+	"on":       ON,
+	"fail":     FAIL,
 }
 
 // LookupIdent returns the keyword type for ident, or IDENT if it is not a keyword.

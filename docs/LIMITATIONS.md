@@ -11,6 +11,7 @@ see `task.md` (roadmap) and the Parking Lot for scheduling.*
 | Missing | Why it hurts | Status |
 |---|---|---|
 | **Structured pipelines** (`\| filter user.active`) | Text pipelines only — no structured-data stages yet | Parking lot, after text pipelines prove out |
+| **Command paths starting with `/` or `./`** | `run /usr/bin/git` and `./script.sh` don't lex (division/dot conflict) — use `sh -c "..."` today | Needs lexer design work |
 | **Globbing** (`*.txt`) | Wildcards pass through literally to commands | Not started |
 
 ## Language Gaps

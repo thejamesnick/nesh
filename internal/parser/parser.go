@@ -90,7 +90,7 @@ func OpenBlocks(src string) int {
 		switch t.Type {
 		case token.EOF:
 			return depth
-		case token.IF, token.FN, token.WHILE, token.FOR:
+		case token.IF, token.FN, token.WHILE, token.FOR, token.TRY:
 			depth++
 		case token.END:
 			depth--
@@ -133,6 +133,10 @@ func (p *parser) parseStmt() (ast.Stmt, bool) {
 		return p.parseBreak()
 	case token.CONT:
 		return p.parseContinue()
+	case token.TRY:
+		return p.parseTry()
+	case token.FAIL:
+		return p.parseFail()
 	case token.IDENT:
 		if p.peek.Type == token.LPAREN {
 			call, ok := p.parseCall(p.cur.Literal, ast.Pos{Line: p.cur.Line, Column: p.cur.Column})
@@ -378,6 +382,56 @@ func (p *parser) parseContinue() (ast.Stmt, bool) {
 	}
 	p.next() // consume 'continue'
 	return &ast.ContinueStmt{Pos: pos}, true
+}
+
+// parseTry parses `try ... [on failure ...] end`.
+func (p *parser) parseTry() (ast.Stmt, bool) {
+	pos := ast.Pos{Line: p.cur.Line, Column: p.cur.Column}
+	p.next() // consume 'try'
+	node := &ast.TryStmt{Pos: pos}
+
+	body, ok := p.parseBlock(token.ON, token.END)
+	if !ok {
+		return nil, false
+	}
+	node.Try = body
+
+	if p.at(token.ON) {
+		p.next() // consume 'on'
+		if !(p.at(token.IDENT) && p.cur.Literal == "failure") {
+			p.fail(`expected "failure" after on, got %q`, p.cur.Literal)
+			return nil, false
+		}
+		p.next()
+		handler, ok := p.parseBlock(token.END)
+		if !ok {
+			return nil, false
+		}
+		node.On = handler
+		node.HasOn = true
+	}
+
+	if !p.expect(token.END) {
+		return nil, false
+	}
+	return node, true
+}
+
+// parseFail parses `fail ["message"]`.
+func (p *parser) parseFail() (ast.Stmt, bool) {
+	pos := ast.Pos{Line: p.cur.Line, Column: p.cur.Column}
+	node := &ast.FailStmt{Pos: pos}
+	p.next() // consume 'fail'
+	switch p.cur.Type {
+	case token.NEWLINE, token.EOF, token.END, token.ELSE, token.ELIF:
+		return node, true
+	}
+	msg, ok := p.parseExpr(precLowest)
+	if !ok {
+		return nil, false
+	}
+	node.Msg = msg
+	return node, true
 }
 
 func (p *parser) parseWhile() (ast.Stmt, bool) {

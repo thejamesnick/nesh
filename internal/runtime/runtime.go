@@ -25,9 +25,12 @@ type Output interface {
 }
 
 // Error is a runtime failure with the position of the offending node.
+// Fail marks errors raised by the `fail` statement: they are catchable
+// by try and cross function boundaries. All other errors abort.
 type Error struct {
 	Line, Column int
 	Msg          string
+	Fail         bool
 }
 
 func (e *Error) Error() string {
@@ -194,6 +197,8 @@ func (r *Runtime) Run(script *ast.Script) *Error {
 			return errAt(f.pos, "break outside loop")
 		case flowContinue:
 			return errAt(f.pos, "continue outside loop")
+		case flowFail:
+			return errAt(f.pos, "uncaught failure: %s", f.msg)
 		default:
 			return errAt(f.pos, "return outside function")
 		}
@@ -215,8 +220,10 @@ func (r *Runtime) lookup(name string) (Value, bool) {
 	return nil, false
 }
 
+// failError marker removed — Error.Fail carries it instead.
+
 // flow signals unwinding through blocks: return to the nearest call,
-// break/continue to the nearest enclosing loop.
+// break/continue to the nearest enclosing loop, failure to the nearest try.
 type flowKind int
 
 const (
@@ -224,11 +231,13 @@ const (
 	flowReturn
 	flowBreak
 	flowContinue
+	flowFail
 )
 
 type flow struct {
 	kind flowKind
 	v    Value   // return payload (flowReturn only)
+	msg  string  // failure message (flowFail only)
 	pos  ast.Pos // source position of the triggering statement
 }
 
@@ -333,6 +342,47 @@ func (r *Runtime) execStmt(stmt ast.Stmt) (*flow, *Error) {
 		return &flow{kind: flowBreak, pos: s.Pos}, nil
 	case *ast.ContinueStmt:
 		return &flow{kind: flowContinue, pos: s.Pos}, nil
+	case *ast.FailStmt:
+		msg := "failed"
+		if s.Msg != nil {
+			v, err := r.eval(s.Msg)
+			if err != nil {
+				return nil, err
+			}
+			msg = v.String()
+		}
+		r.emit(Event{Type: "fail", Line: s.Pos.Line, Column: s.Pos.Column, Text: msg})
+		return &flow{kind: flowFail, msg: msg, pos: s.Pos}, nil
+	case *ast.TryStmt:
+		f, rerr := r.execBlock(s.Try)
+		var msg string
+		switch {
+		case rerr != nil:
+			if !rerr.Fail { // only explicit failures are catchable
+				return nil, rerr
+			}
+			msg = rerr.Msg
+		case f != nil && f.kind == flowFail:
+			msg = f.msg
+		default: // clean finish, or return/break/continue unwinding past the try
+			return f, nil
+		}
+
+		if !s.HasOn { // no handler: swallow, keep going after `end`
+			return nil, nil
+		}
+		r.scopes[len(r.scopes)-1]["failure"] = Str(msg)
+		hf, herr := r.execBlock(s.On)
+		if herr != nil {
+			if herr.Fail { // handler failed → propagate outward
+				return &flow{kind: flowFail, msg: herr.Msg, pos: ast.Pos{Line: herr.Line, Column: herr.Column}}, nil
+			}
+			return nil, herr
+		}
+		if hf != nil && hf.kind == flowFail { // `fail` inside the handler → outer try (if any)
+			return hf, nil
+		}
+		return nil, nil
 	case *ast.PipelineStmt:
 		_, err := r.runCommand(s.Pos, s.Stages[0].Name, s.Stages[0].Args, s.Stages[0].Redirects, s.Stages[1:])
 		return nil, err
@@ -468,6 +518,8 @@ func (r *Runtime) doImport(s *ast.ImportStmt) *Error {
 			return errAt(f.pos, "break outside loop")
 		case flowContinue:
 			return errAt(f.pos, "continue outside loop")
+		case flowFail:
+			return errAt(f.pos, "uncaught failure: %s", f.msg)
 		default:
 			return errAt(f.pos, "return outside function")
 		}
@@ -727,6 +779,10 @@ func (r *Runtime) callFunc(n *ast.CallExpr, f *Func, args []Value) (Value, *Erro
 		return Bool(false), nil // no explicit return → false (documented)
 	case ret.kind == flowReturn:
 		return ret.v, nil
+	case ret.kind == flowFail:
+		// Carry the failure through the error channel so it survives
+		// arbitrarily deep call stacks; try recognizes Error.Fail.
+		return nil, &Error{Line: ret.pos.Line, Column: ret.pos.Column, Msg: ret.msg, Fail: true}
 	default: // break/continue never cross a fn boundary — loops are reset there
 		return nil, errAt(ret.pos, "break/continue outside loop")
 	}

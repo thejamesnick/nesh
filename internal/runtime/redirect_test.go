@@ -263,14 +263,14 @@ func TestRunPipelineExitCodeIsLastStage(t *testing.T) {
 		case "ok":
 			fmt.Fprintln(stdout, "data")
 			return 0
-		case "fail":
+		case "boom":
 			return 3
 		}
 		return 0
 	}
 	rt.SetRunner(fr)
 
-	script, perr := parser.Parse("let n = run ok | fail\nprint n\n")
+	script, perr := parser.Parse("let n = run ok | boom\nprint n\n")
 	if perr != nil {
 		t.Fatalf("parse error: %v", perr)
 	}
