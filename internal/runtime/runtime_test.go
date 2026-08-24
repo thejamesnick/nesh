@@ -315,17 +315,23 @@ func TestFunctionErrors(t *testing.T) {
 // fakeRunner records commands instead of touching the OS.
 type fakeRunner struct {
 	calls []struct {
-		name string
-		args []string
+		name  string
+		args  []string
+		stdin string
 	}
 	code int
 }
 
-func (f *fakeRunner) Run(name string, args []string, stdout, stderr io.Writer) int {
+func (f *fakeRunner) Run(name string, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	var b []byte
+	if stdin != nil {
+		b, _ = io.ReadAll(stdin)
+	}
 	f.calls = append(f.calls, struct {
-		name string
-		args []string
-	}{name, args})
+		name  string
+		args  []string
+		stdin string
+	}{name, args, string(b)})
 	fmt.Fprintln(stdout, "ran:", name)
 	return f.code
 }

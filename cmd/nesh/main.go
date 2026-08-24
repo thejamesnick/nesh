@@ -122,6 +122,7 @@ func runWithEvents(src, baseDir string) (*ast.Script, []runtime.Event, *parser.E
 	var events []runtime.Event
 	rt := runtime.New(bufio.NewWriter(io.Discard))
 	rt.SetRunner(shell.RealRunner{})
+	rt.SetStdin(os.Stdin)
 	rt.SetBaseDir(baseDir)
 	builtin.RegisterAll(rt, shell.RealFS{})
 	rt.SetFileSystem(shell.RealFS{})
@@ -173,6 +174,7 @@ func execSourceIn(src, baseDir string) int {
 	out := bufio.NewWriter(os.Stdout)
 	rt := runtime.New(out)
 	rt.SetRunner(shell.RealRunner{})
+	rt.SetStdin(os.Stdin)
 	rt.SetBaseDir(baseDir)
 	builtin.RegisterAll(rt, shell.RealFS{})
 	rt.SetFileSystem(shell.RealFS{})
@@ -212,6 +214,7 @@ func repl(in *os.File, outFile *os.File) int {
 
 	rt := runtime.New(w)
 	rt.SetRunner(shell.RealRunner{})
+	rt.SetStdin(os.Stdin)
 	builtin.RegisterAll(rt, shell.RealFS{})
 	rt.SetFileSystem(shell.RealFS{})
 	rt.SetRuntimeFactory(func(child *runtime.Runtime) {

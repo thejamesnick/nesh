@@ -10,10 +10,7 @@ see `task.md` (roadmap) and the Parking Lot for scheduling.*
 
 | Missing | Why it hurts | Status |
 |---|---|---|
-| **Pipelines (`\|`)** | Can't do `cat log \| grep error` — the Unix composability habit | Phase 5+ design; "pipelines stay sacred" per goal.md |
-| **Stdin passthrough** | System commands can't read stdin from the script or terminal | Tracked in T2.6 notes |
-| **Redirection** (`>`, `>>`, `<`) | No writing command output to files via shell syntax | Must use `write` builtin instead |
-| **Background jobs / signals** | No `&`, no Ctrl-C handling of children, no `wait` | Not started |
+| **Pipelines (`\|`)** | Can't do `cat log \| grep error` — the Unix composability habit | **T4.3 — next up** |
 | **Globbing** (`*.txt`) | Wildcards pass through literally to commands | Not started |
 
 ## Language Gaps

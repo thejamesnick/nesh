@@ -110,20 +110,29 @@ type ImportStmt struct {
 	Alias string `json:"alias,omitempty"`
 }
 
+// Redirect is a stream redirection attached to a command: Op is ">",
+// ">>" (append), or "<" (stdin from file); Path is the target file.
+type Redirect struct {
+	Op   string `json:"op"`
+	Path string `json:"path"`
+}
+
 // CmdStmt is a bare system command: `git status --short`. Words are literal
 // (no variable expansion yet — Phase 3 decision).
 type CmdStmt struct {
-	Pos  Pos      `json:"pos"`
-	Name string   `json:"name"`
-	Args []string `json:"args,omitempty"`
+	Pos       Pos        `json:"pos"`
+	Name      string     `json:"name"`
+	Args      []string   `json:"args,omitempty"`
+	Redirects []Redirect `json:"redirects,omitempty"`
 }
 
 // RunExpr is `run <command>` in expression position; it evaluates to the
 // command's exit code as an Int.
 type RunExpr struct {
-	Pos  Pos      `json:"pos"`
-	Name string   `json:"name"`
-	Args []string `json:"args,omitempty"`
+	Pos       Pos        `json:"pos"`
+	Name      string     `json:"name"`
+	Args      []string   `json:"args,omitempty"`
+	Redirects []Redirect `json:"redirects,omitempty"`
 }
 
 // Ident is a variable reference.

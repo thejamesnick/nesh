@@ -182,3 +182,57 @@ func TestBreakContinueOutsideLoop(t *testing.T) {
 		}
 	}
 }
+
+func TestRedirects(t *testing.T) {
+	s, err := Parse("git log > out.txt\n")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	cmd := s.Stmts[0].(*ast.CmdStmt)
+	want := []ast.Redirect{{Op: ">", Path: "out.txt"}}
+	if len(cmd.Redirects) != 1 || cmd.Redirects[0] != want[0] {
+		t.Fatalf("got %+v, want %+v", cmd.Redirects, want)
+	}
+
+	// mixed args + multiple redirects, quoted paths, run expression
+	s, err = Parse("let n = run cat < \"in file.txt\" > counts.txt >> totals.txt\n")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	let := s.Stmts[0].(*ast.LetStmt)
+	runE := let.Value.(*ast.RunExpr)
+	got := runE.Redirects
+	wantAll := []ast.Redirect{
+		{Op: "<", Path: "in file.txt"},
+		{Op: ">", Path: "counts.txt"},
+		{Op: ">>", Path: "totals.txt"},
+	}
+	if len(got) != 3 {
+		t.Fatalf("got %d redirects, want 3: %+v", len(got), got)
+	}
+	for i, w := range wantAll {
+		if got[i] != w {
+			t.Errorf("redirect %d: got %+v, want %+v", i, got[i], w)
+		}
+	}
+}
+
+func TestRedirectErrors(t *testing.T) {
+	cases := []struct {
+		src string
+		col int
+	}{
+		{"git log >\n", 10},      // missing path: error points at the newline
+		{"cat < # comment\n", 16}, // missing path: comment skipped, error at newline
+	}
+	for _, c := range cases {
+		_, err := Parse(c.src)
+		if err == nil {
+			t.Errorf("input %q: expected error, got none", c.src)
+			continue
+		}
+		if err.Column != c.col {
+			t.Errorf("input %q: error at col %d, want %d (%s)", c.src, err.Column, c.col, err.Msg)
+		}
+	}
+}

@@ -201,3 +201,13 @@ func TestBenchmarkShapedInput(t *testing.T) {
 		t.Fatalf("got %d newlines / %d lets, want 3/2\n%v", newlines, lets, toks)
 	}
 }
+
+func TestAppendOperator(t *testing.T) {
+	assertTokens(t, "a >> b > c < d",
+		[]tok{
+			{token.IDENT, "a"}, {token.APPEND, ">>"},
+			{token.IDENT, "b"}, {token.GT, ">"},
+			{token.IDENT, "c"}, {token.LT, "<"},
+			{token.IDENT, "d"}, {token.EOF, ""},
+		})
+}

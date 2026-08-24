@@ -209,6 +209,14 @@ func (p *parser) parseCmdPhrase(name string) (ast.Stmt, bool) {
 	p.next() // consume the name
 	stmt := &ast.CmdStmt{Pos: pos, Name: name}
 	for !p.atStatementBoundary() {
+		if p.atRedirect() {
+			redir, ok := p.parseRedirect()
+			if !ok {
+				return nil, false
+			}
+			stmt.Redirects = append(stmt.Redirects, redir)
+			continue
+		}
 		word, ok := p.parseCmdWord()
 		if !ok {
 			return nil, false
@@ -216,6 +224,30 @@ func (p *parser) parseCmdPhrase(name string) (ast.Stmt, bool) {
 		stmt.Args = append(stmt.Args, word)
 	}
 	return stmt, true
+}
+
+// atRedirect reports whether cur starts a redirection (> >> <).
+func (p *parser) atRedirect() bool {
+	switch p.cur.Type {
+	case token.GT, token.APPEND, token.LT:
+		return true
+	}
+	return false
+}
+
+// parseRedirect parses `> path` / `>> path` / `< path`; cur is the operator.
+func (p *parser) parseRedirect() (ast.Redirect, bool) {
+	op := p.cur.Literal
+	p.next()
+	switch p.cur.Type {
+	case token.IDENT, token.INT, token.FLOAT, token.STRING:
+		path := p.cur.Literal
+		p.next()
+		return ast.Redirect{Op: op, Path: path}, true
+	default:
+		p.fail("expected file path after %s, got %q", op, p.cur.Literal)
+		return ast.Redirect{}, false
+	}
 }
 
 // parseRunExpr parses `run <command>` in expression position.
@@ -230,6 +262,14 @@ func (p *parser) parseRunExpr() (ast.Expr, bool) {
 	p.next()
 	expr := &ast.RunExpr{Pos: pos, Name: name}
 	for !p.atStatementBoundary() {
+		if p.atRedirect() {
+			redir, ok := p.parseRedirect()
+			if !ok {
+				return nil, false
+			}
+			expr.Redirects = append(expr.Redirects, redir)
+			continue
+		}
 		word, ok := p.parseCmdWord()
 		if !ok {
 			return nil, false

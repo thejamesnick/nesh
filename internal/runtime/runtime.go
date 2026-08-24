@@ -8,6 +8,7 @@ package runtime
 import (
 	"cmp"
 	"fmt"
+	"io"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -116,6 +117,7 @@ func Truthy(v Value) bool {
 // without one, command syntax is a runtime error (keeps tests OS-free).
 type Runtime struct {
 	out      Output
+	stdin    io.Reader // source for child-process stdin (nil = none)
 	scopes   []map[string]Value
 	runner   shell.CommandRunner
 	events   func(Event)
@@ -133,6 +135,10 @@ func New(out Output) *Runtime {
 
 // SetRunner enables system commands (`git status`, `run ...`).
 func (r *Runtime) SetRunner(runner shell.CommandRunner) { r.runner = runner }
+
+// SetStdin sets what child processes read when no `<` redirect applies
+// (wire os.Stdin for interactive/script use).
+func (r *Runtime) SetStdin(stdin io.Reader) { r.stdin = stdin }
 
 // Define installs a builtin function in the global scope.
 func (r *Runtime) Define(name string, fn func(args []Value) (Value, error)) {
@@ -326,7 +332,7 @@ func (r *Runtime) execStmt(stmt ast.Stmt) (*flow, *Error) {
 	case *ast.ContinueStmt:
 		return &flow{kind: flowContinue, pos: s.Pos}, nil
 	case *ast.CmdStmt:
-		_, err := r.runCommand(s.Pos, s.Name, s.Args)
+		_, err := r.runCommand(s.Pos, s.Name, s.Args, s.Redirects)
 		return nil, err
 	case *ast.ImportStmt:
 		return nil, r.doImport(s)
@@ -371,7 +377,7 @@ func (r *Runtime) eval(e ast.Expr) (Value, *Error) {
 	case *ast.CallExpr:
 		return r.call(n)
 	case *ast.RunExpr:
-		code, err := r.runCommand(n.Pos, n.Name, n.Args)
+		code, err := r.runCommand(n.Pos, n.Name, n.Args, n.Redirects)
 		if err != nil {
 			return nil, err
 		}
@@ -491,8 +497,9 @@ type outputWriter struct{ o Output }
 
 func (w outputWriter) Write(p []byte) (int, error) { return w.o.WriteString(string(p)) }
 
-// runCommand executes a system command through the injected runner.
-func (r *Runtime) runCommand(pos ast.Pos, name string, args []string) (int, *Error) {
+// runCommand executes a system command through the injected runner,
+// applying redirections: `>` write, `>>` append, `<` read stdin.
+func (r *Runtime) runCommand(pos ast.Pos, name string, args []string, redirects []ast.Redirect) (int, *Error) {
 	if r.runner == nil {
 		return 0, errAt(pos, "system commands are not available here")
 	}
@@ -501,8 +508,49 @@ func (r *Runtime) runCommand(pos ast.Pos, name string, args []string) (int, *Err
 			return 0, errAt(pos, "%s is a variable, not a command — did you mean print %s?", name, name)
 		}
 	}
-	w := outputWriter{r.out}
-	code := r.runner.Run(name, args, w, w)
+
+	var stdin io.Reader = r.stdin
+	var stdout io.Writer = outputWriter{r.out}
+	var closers []io.Closer
+	defer func() {
+		for _, c := range closers {
+			c.Close()
+		}
+	}()
+
+	if len(redirects) > 0 {
+		opener, hasOpener := r.fs.(shell.Opener)
+		if !hasOpener {
+			return 0, errAt(pos, "redirection needs filesystem access — not available here")
+		}
+		for _, rd := range redirects {
+			switch rd.Op {
+			case "<":
+				f, err := opener.OpenRead(rd.Path)
+				if err != nil {
+					return 0, errAt(pos, "cannot read %s: %v", rd.Path, err)
+				}
+				stdin = f
+				closers = append(closers, f)
+			case ">":
+				f, err := opener.OpenWrite(rd.Path, false)
+				if err != nil {
+					return 0, errAt(pos, "cannot write %s: %v", rd.Path, err)
+				}
+				stdout = f
+				closers = append(closers, f)
+			case ">>":
+				f, err := opener.OpenWrite(rd.Path, true)
+				if err != nil {
+					return 0, errAt(pos, "cannot append to %s: %v", rd.Path, err)
+				}
+				stdout = f
+				closers = append(closers, f)
+			}
+		}
+	}
+
+	code := r.runner.Run(name, args, stdin, stdout, stdout)
 	r.emit(Event{Type: "command", Line: pos.Line, Column: pos.Column, Name: name, Args: args, Code: code})
 	return code, nil
 }

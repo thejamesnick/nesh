@@ -25,6 +25,7 @@ const (
 	GT       Type = ">"
 	LTE      Type = "<="
 	GTE      Type = ">="
+	APPEND   Type = ">>"
 
 	// UNTERM marks a string literal that never closed before EOF.
 	UNTERM Type = "UNTERM"

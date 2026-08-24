@@ -195,6 +195,10 @@ func (l *Lexer) readOperator() (token.Type, string) {
 		}
 		return token.LT, "<"
 	case '>':
+		if next == '>' {
+			l.readChar()
+			return token.APPEND, ">>"
+		}
 		if next == '=' {
 			l.readChar()
 			return token.GTE, ">="

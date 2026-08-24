@@ -25,6 +25,12 @@
 | Run any PATH command directly | `git status`, `ls -la`, `docker compose up -d` |
 | Capture exit codes | `let code = run git status` — no `$?` needed |
 | Literal args + merged flags | `-la`, `--force` pass through cleanly |
+| Redirect stdout to file (write) | `git log > out.txt` |
+| Redirect stdout to file (append) | `run build >> build.log` |
+| Feed a file to stdin | `wc -l < access.log` |
+| Stdin passthrough | commands read the script's own stdin when no `<` redirect is given |
+
+Redirect paths with absolute locations need quoting: `> "/var/log/app.log"`.
 
 ## Standard Library
 
