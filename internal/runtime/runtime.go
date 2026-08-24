@@ -27,10 +27,13 @@ type Output interface {
 // Error is a runtime failure with the position of the offending node.
 // Fail marks errors raised by the `fail` statement: they are catchable
 // by try and cross function boundaries. All other errors abort.
+// ExitCode >= 0 marks an `exit` statement: cmd/nesh turns it into the
+// process exit code after flushing output.
 type Error struct {
 	Line, Column int
 	Msg          string
 	Fail         bool
+	ExitCode     int
 }
 
 func (e *Error) Error() string {
@@ -399,6 +402,22 @@ func (r *Runtime) execStmt(stmt ast.Stmt) (*flow, *Error) {
 			return hf, nil
 		}
 		return nil, nil
+	case *ast.ExitStmt:
+		code := 0
+		if s.Code != nil {
+			v, err := r.eval(s.Code)
+			if err != nil {
+				return nil, err
+			}
+			if i, ok := v.(Int); ok {
+				code = int(i)
+			}
+		}
+		// Carried as a plain error so every layer (loops, try, fn calls,
+		// module boundaries) propagates it untouched to cmd/nesh.
+		e := errAt(s.Pos, "exit")
+		e.ExitCode = code
+		return nil, e
 	case *ast.PipelineStmt:
 		_, err := r.runCommand(s.Pos, s.Stages[0].Name, s.Stages[0].Args, s.Stages[0].Redirects, s.Stages[1:])
 		return nil, err
@@ -827,7 +846,7 @@ func (r *Runtime) callFunc(n *ast.CallExpr, f *Func, args []Value) (Value, *Erro
 	case ret.kind == flowFail:
 		// Carry the failure through the error channel so it survives
 		// arbitrarily deep call stacks; try recognizes Error.Fail.
-		return nil, &Error{Line: ret.pos.Line, Column: ret.pos.Column, Msg: ret.msg, Fail: true}
+		return nil, &Error{Line: ret.pos.Line, Column: ret.pos.Column, Msg: ret.msg, Fail: true, ExitCode: -1}
 	default: // break/continue never cross a fn boundary — loops are reset there
 		return nil, errAt(ret.pos, "break/continue outside loop")
 	}
@@ -980,5 +999,5 @@ func boolResult[T cmp.Ordered](op string, a, b T) Value {
 }
 
 func errAt(p ast.Pos, format string, args ...any) *Error {
-	return &Error{Line: p.Line, Column: p.Column, Msg: fmt.Sprintf(format, args...)}
+	return &Error{Line: p.Line, Column: p.Column, Msg: fmt.Sprintf(format, args...), ExitCode: -1}
 }

@@ -119,6 +119,13 @@ type FailStmt struct {
 	Msg Expr `json:"msg,omitempty"`
 }
 
+// ExitStmt is `exit [code]` — terminates the script with an exit code
+// (default 0). Not catchable by try.
+type ExitStmt struct {
+	Pos  Pos  `json:"pos"`
+	Code Expr `json:"code,omitempty"`
+}
+
 // ImportStmt is `import "path.nsh" [as alias]`.
 // Without an alias, the module's definitions merge into globals; with one,
 // they are reachable via dotted access (alias.name).
@@ -242,6 +249,7 @@ func (s *BreakStmt) Position() Pos  { return s.Pos }
 func (s *ContinueStmt) Position() Pos { return s.Pos }
 func (s *TryStmt) Position() Pos    { return s.Pos }
 func (s *FailStmt) Position() Pos   { return s.Pos }
+func (s *ExitStmt) Position() Pos   { return s.Pos }
 func (s *CmdStmt) Position() Pos    { return s.Pos }
 func (s *PipelineStmt) Position() Pos { return s.Pos }
 func (e *RunExpr) Position() Pos    { return e.Pos }
@@ -267,6 +275,7 @@ func (*BreakStmt) stmtNode()  {}
 func (*ContinueStmt) stmtNode() {}
 func (*TryStmt) stmtNode()    {}
 func (*FailStmt) stmtNode()   {}
+func (*ExitStmt) stmtNode()   {}
 func (*CmdStmt) stmtNode()    {}
 func (*PipelineStmt) stmtNode() {}
 

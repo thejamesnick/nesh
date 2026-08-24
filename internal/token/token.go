@@ -64,6 +64,7 @@ const (
 	TRY    Type = "try"
 	ON     Type = "on"
 	FAIL   Type = "fail"
+	EXIT   Type = "exit"
 )
 
 var keywords = map[string]Type{
@@ -92,6 +93,7 @@ var keywords = map[string]Type{
 	"try":      TRY,
 	"on":       ON,
 	"fail":     FAIL,
+	"exit":     EXIT,
 }
 
 // LookupIdent returns the keyword type for ident, or IDENT if it is not a keyword.

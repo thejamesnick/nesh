@@ -183,6 +183,9 @@ func execSourceIn(src, baseDir string) int {
 	})
 	if rerr := rt.Run(script); rerr != nil {
 		out.Flush()
+		if rerr.ExitCode >= 0 { // `exit` statement: not an error, just a code
+			return rerr.ExitCode
+		}
 		fmt.Fprintf(os.Stderr, "error: %v\n", rerr)
 		return 1
 	}

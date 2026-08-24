@@ -132,3 +132,29 @@ func TestConditionalFailWithExitCode(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+func TestExitStatement(t *testing.T) {
+	// exit carries a code through every layer as a plain error
+	script, _ := parser.Parse("for x in items()\nexit 3\nend\n")
+	rt := New(&fakeOutput{})
+	rt.Define("items", func(args []Value) (Value, error) { return List{Int(1)}, nil })
+	err := rt.Run(script)
+	if err == nil || err.ExitCode != 3 {
+		t.Fatalf("got %v, want ExitCode 3", err)
+	}
+
+	// bare exit = 0
+	out, err := tryRun(t, "print \"bye\"\nexit\nprint \"never\"\n")
+	if err.ExitCode != 0 {
+		t.Fatalf("bare exit: got %v", err)
+	}
+	if out != "bye\n" {
+		t.Fatalf("output before exit: %q", out)
+	}
+
+	// exit is NOT catchable by try
+	_, err = tryRun(t, "try\nexit 5\non failure\nprint \"caught\"\nend\n")
+	if err == nil || err.ExitCode != 5 {
+		t.Fatalf("try caught exit: %v", err)
+	}
+}

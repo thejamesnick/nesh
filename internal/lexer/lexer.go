@@ -46,7 +46,7 @@ func (l *Lexer) NextToken() token.Token {
 		tok.Literal = "\n"
 	case isDigit(ch):
 		tok.Type, tok.Literal = l.readNumber()
-	case isIdentStart(ch):
+	case l.isWordStart(ch):
 		lit := l.readIdentifier()
 		tok.Type = token.LookupIdent(lit)
 		tok.Literal = lit
@@ -229,6 +229,28 @@ func isDigit(ch byte) bool { return ch >= '0' && ch <= '9' }
 
 func isIdentStart(ch byte) bool {
 	return ch == '_' || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
+}
+
+// isWordStart also accepts '.' and '/' as the FIRST character of a word
+// when a word character follows — that is how paths (`./...`,
+// `/usr/bin/git`, `scripts/check.nsh`) lex as one token. Interior
+// '.', '-', '/' were already absorbed by isIdentPart. Division and
+// subtraction therefore require spaces around the operator, which is
+// the documented style.
+func (l *Lexer) isWordStart(ch byte) bool {
+	if isIdentStart(ch) {
+		return true
+	}
+	switch ch {
+	case '.', '/':
+		return isIdentPart(peekAt(l.input, l.readPosition+1))
+	case '-':
+		// A leading '-' starts a word only when clearly a flag or path
+		// (-force, --dry-run, -x.nsh); '-7' must stay unary minus.
+		next := peekAt(l.input, l.readPosition+1)
+		return isIdentStart(next) || next == '.' || next == '/' || next == '_'
+	}
+	return false
 }
 
 // isIdentPart also folds '.', '-', and '/' into identifiers so paths and

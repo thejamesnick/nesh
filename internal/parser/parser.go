@@ -137,6 +137,8 @@ func (p *parser) parseStmt() (ast.Stmt, bool) {
 		return p.parseTry()
 	case token.FAIL:
 		return p.parseFail()
+	case token.EXIT:
+		return p.parseExit()
 	case token.IDENT:
 		if p.peek.Type == token.LPAREN {
 			call, ok := p.parseCall(p.cur.Literal, ast.Pos{Line: p.cur.Line, Column: p.cur.Column})
@@ -431,6 +433,23 @@ func (p *parser) parseFail() (ast.Stmt, bool) {
 		return nil, false
 	}
 	node.Msg = msg
+	return node, true
+}
+
+// parseExit parses `exit [code]`.
+func (p *parser) parseExit() (ast.Stmt, bool) {
+	pos := ast.Pos{Line: p.cur.Line, Column: p.cur.Column}
+	node := &ast.ExitStmt{Pos: pos}
+	p.next() // consume 'exit'
+	switch p.cur.Type {
+	case token.NEWLINE, token.EOF, token.END, token.ELSE, token.ELIF:
+		return node, true
+	}
+	code, ok := p.parseExpr(precLowest)
+	if !ok {
+		return nil, false
+	}
+	node.Code = code
 	return node, true
 }
 
