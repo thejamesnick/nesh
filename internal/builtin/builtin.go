@@ -7,6 +7,7 @@ package builtin
 
 import (
 	"fmt"
+	"io"
 	"math"
 	"strings"
 
@@ -22,6 +23,88 @@ func RegisterAll(rt *runtime.Runtime, fs shell.FileSystem) {
 	registerStrings(rt)
 	registerMath(rt)
 	registerFiles(rt, fs)
+	registerCommands(rt)
+}
+
+// registerCommands installs shell-style builtin commands. These run in
+// place of a PATH spawn, so scripts that call them per line (logging
+// loops, redirect-heavy work) skip the fork+exec cost entirely.
+//
+// printf supports the common subset: %s %d %f %% and \\n \\t escapes.
+// echo joins args with spaces; -n suppresses the trailing newline.
+func registerCommands(rt *runtime.Runtime) {
+	rt.DefineCommand("printf", func(args []string, stdout io.Writer) int {
+		if len(args) == 0 {
+			fmt.Fprintln(stdout, "printf: missing format string")
+			return 2
+		}
+		format := expandEscapes(args[0])
+		// Reuse %s for every value verb: command words are strings here.
+		out := format
+		vals := args[1:]
+		vi := 0
+		var b strings.Builder
+		for i := 0; i < len(out); i++ {
+			ch := out[i]
+			if ch != '%' || i+1 >= len(out) {
+				b.WriteByte(ch)
+				continue
+			}
+			i++
+			switch out[i] {
+			case '%':
+				b.WriteByte('%')
+			case 's', 'd', 'f':
+				if vi < len(vals) {
+					b.WriteString(vals[vi])
+					vi++
+				}
+			default:
+				b.WriteByte('%')
+				b.WriteByte(out[i])
+			}
+		}
+		fmt.Fprint(stdout, b.String())
+		return 0
+	})
+
+	rt.DefineCommand("echo", func(args []string, stdout io.Writer) int {
+		newline := true
+		words := args
+		if len(words) > 0 && words[0] == "-n" {
+			newline = false
+			words = words[1:]
+		}
+		fmt.Fprint(stdout, strings.Join(words, " "))
+		if newline {
+			fmt.Fprint(stdout, "\n")
+		}
+		return 0
+	})
+}
+
+// expandEscapes converts \n and \t in a literal word to real characters.
+func expandEscapes(s string) string {
+	if !strings.ContainsRune(s, '\\') {
+		return s
+	}
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\\' && i+1 < len(s) {
+			switch s[i+1] {
+			case 'n':
+				b.WriteByte('\n')
+				i++
+				continue
+			case 't':
+				b.WriteByte('\t')
+				i++
+				continue
+			}
+		}
+		b.WriteByte(s[i])
+	}
+	return b.String()
 }
 
 // wantArgs validates argument count.

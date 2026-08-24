@@ -69,6 +69,17 @@ type Builtin struct {
 
 func (b *Builtin) String() string { return "<builtin " + b.Name + ">" }
 
+// CommandBuiltin is a shell-style builtin: it runs in place of a PATH
+// spawn, receives the raw command words (no evaluation), writes its own
+// output, and returns an exit code. This is how printf/echo-class
+// utilities avoid the ~10ms fork+exec cost per line.
+type CommandBuiltin struct {
+	Name string
+	Fn   func(args []string, stdout io.Writer) int
+}
+
+func (c *CommandBuiltin) String() string { return "<command " + c.Name + ">" }
+
 // Module is an imported file's exported definitions.
 type Module struct {
 	Name    string
@@ -150,6 +161,11 @@ func (r *Runtime) Define(name string, fn func(args []Value) (Value, error)) {
 	r.scopes[0][name] = &Builtin{Name: name, Fn: fn}
 }
 
+// DefineCommand installs a shell-style builtin command (printf/echo-class).
+func (r *Runtime) DefineCommand(name string, fn func(args []string, stdout io.Writer) int) {
+	r.scopes[0][name] = &CommandBuiltin{Name: name, Fn: fn}
+}
+
 // SetFileSystem enables file builtins and imports.
 func (r *Runtime) SetFileSystem(fs shell.FileSystem) { r.fs = fs }
 
@@ -227,7 +243,7 @@ func (r *Runtime) lookup(name string) (Value, bool) {
 type flowKind int
 
 const (
-	flowNone      flowKind = iota
+	flowNone flowKind = iota
 	flowReturn
 	flowBreak
 	flowContinue
@@ -559,16 +575,31 @@ func (w outputWriter) Write(p []byte) (int, error) { return w.o.WriteString(stri
 // Each non-final stage's stdout streams into the next stage's stdin
 // (concurrently, like a shell); the returned code is the LAST stage's.
 func (r *Runtime) runCommand(pos ast.Pos, name string, args []string, redirects []ast.Redirect, pipe []ast.CmdStage) (int, *Error) {
-	if r.runner == nil {
-		return 0, errAt(pos, "system commands are not available here")
-	}
 	stages := make([]ast.CmdStage, 0, len(pipe)+1)
 	first := ast.CmdStage{Name: name, Args: args, Redirects: redirects}
 	stages = append(stages, first)
 	stages = append(stages, pipe...)
+
+	// Shadow guards: a variable in scope means a typo'd bare word; a fn
+	// name doesn't block spawning the identically-named external command,
+	// and shell builtins execute as commands by design.
+	if r.runner == nil {
+		// Without a runner only shell-style builtins can execute.
+		for _, st := range stages {
+			v, ok := r.lookup(st.Name)
+			if !ok {
+				return 0, errAt(pos, "system commands are not available here")
+			}
+			if _, isCmd := v.(*CommandBuiltin); !isCmd {
+				return 0, errAt(pos, "system commands are not available here")
+			}
+		}
+	}
 	for _, st := range stages {
 		if v, ok := r.lookup(st.Name); ok {
-			if _, isFn := v.(*Func); !isFn {
+			switch v.(type) {
+			case *Func, *CommandBuiltin:
+			default:
 				return 0, errAt(pos, "%s is a variable, not a command — did you mean print %s?", st.Name, st.Name)
 			}
 		}
@@ -638,7 +669,7 @@ func (r *Runtime) runCommand(pos ast.Pos, name string, args []string, redirects 
 		}
 
 		if i == n-1 {
-			codes[i] = r.runner.Run(st.Name, st.Args, stdin, stdout, stderrW)
+			codes[i] = r.execStage(st, stdin, stdout, stderrW)
 			closeAll(closers)
 			r.mu.Lock()
 			r.emit(Event{Type: "command", Line: pos.Line, Column: pos.Column, Name: st.Name, Args: st.Args, Code: codes[i]})
@@ -661,8 +692,11 @@ func (r *Runtime) runCommand(pos ast.Pos, name string, args []string, redirects 
 		r.emit(Event{Type: "command", Line: pos.Line, Column: pos.Column, Name: st.Name, Args: st.Args})
 		r.mu.Unlock()
 		go func(i int, st ast.CmdStage, stdin io.Reader, stdout io.Writer, closers []io.Closer) {
-			defer closeAll(closers) // pw closes here → consumer sees EOF
-			codes[i] = r.runner.Run(st.Name, st.Args, stdin, stdout, stderrW)
+			// closers holds pw: closing it sends EOF downstream. The read
+			// side (pr) is closed by runCommand after the final stage —
+			// closing it here would race a still-reading consumer.
+			defer closeAll(closers)
+			codes[i] = r.execStage(st, stdin, stdout, stderrW)
 		}(i, st, stdin, stdout, closers)
 	}
 
@@ -671,7 +705,18 @@ func (r *Runtime) runCommand(pos ast.Pos, name string, args []string, redirects 
 	return code, nil
 }
 
-// claimsStdout reports whether redirects include > or >>.
+// execStage runs one pipeline stage: a command builtin if one is
+// registered under the name, otherwise a PATH spawn. Command builtins
+// ignore stdin (printf/echo-class utilities never read it).
+func (r *Runtime) execStage(st ast.CmdStage, stdin io.Reader, stdout, stderr io.Writer) int {
+	if v, ok := r.lookup(st.Name); ok {
+		if cb, isCmd := v.(*CommandBuiltin); isCmd {
+			return cb.Fn(st.Args, stdout)
+		}
+	}
+	return r.runner.Run(st.Name, st.Args, stdin, stdout, stderr)
+}
+
 func claimsStdout(st ast.CmdStage) bool {
 	for _, rd := range st.Redirects {
 		if rd.Op == ">" || rd.Op == ">>" {

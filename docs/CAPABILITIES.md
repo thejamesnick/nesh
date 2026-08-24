@@ -61,6 +61,7 @@ end
 | Strings | `len`, `upper`, `lower`, `split`, `join`, `contains` |
 | Math | `abs`, `floor`, `round`, `min`, `max` |
 | Files | `read`, `write`, `exists` (via FileSystem seam) |
+| Commands | `printf` (common %s/%d/%% + \n\t), `echo [-n]` — native builtins, no process spawn |
 
 ## Tooling
 
