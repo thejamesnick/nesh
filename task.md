@@ -103,9 +103,10 @@ is easier to write in Nesh than Bash. This is the "I actually use it every day" 
 - [x] T4.4 Error handling v1: `try ... on failure ... end`; commands don't abort script by default
   - DW: failing command inside try jumps to handler; runtime errors still abort; tests
   - Semantics: `fail ["msg"]` raises a catchable failure (crosses fn boundaries); handler sees the `failure` variable; bare `try` swallows; hard runtime errors are NOT catchable — bugs abort loudly
-- [ ] T4.5 Dogfooding gate: rewrite 3 scripts you actually use today in `.nsh` — fix whatever hurts
+- [~] T4.5 Dogfooding gate: rewrite 3 scripts you actually use today in `.nsh` — fix whatever hurts
   - DW: 3 genuine personal automation scripts run daily without bash fallback
-- [ ] T4.6 Phase close-out: benchmarks incl. pipeline category vs bash/dash/zsh, docs updated, tag `v0.4.0`
+- [~] T4.6 Phase close-out: benchmarks incl. pipeline category vs bash/dash/zsh, docs updated, tag `v0.4.0`
+  - Benchmarks done → benchmarks/results/v0.4.0.md (nesh fastest in 4/7; redirect loss = missing printf-class builtins, documented). Tag waits on T4.5.
 
 ---
 
