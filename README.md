@@ -113,6 +113,7 @@ Roadmap:
 |------|-------------|
 | [docs/WHY_NESH.md](docs/WHY_NESH.md) | The philosophy and reason Nesh exists |
 | [docs/CAPABILITIES.md](docs/CAPABILITIES.md) | What Nesh can do right now (v0.3.0 snapshot) |
+| [docs/LIMITATIONS.md](docs/LIMITATIONS.md) | What Nesh can't do yet, and where it's tracked |
 | [docs/TECHNICAL_SPEC.md](docs/TECHNICAL_SPEC.md) | Full product and technical specification |
 | [docs/TECH_STACK.md](docs/TECH_STACK.md) | Technology decisions and component breakdown |
 | [docs/BENCHMARKS.md](docs/BENCHMARKS.md) | Performance strategy and benchmarking plan |
