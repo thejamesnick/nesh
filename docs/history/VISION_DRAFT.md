@@ -1,3 +1,7 @@
+# Archived
+
+> Historical note from before the project docs existed (2026-08-23). Superseded by [goal.md](../../goal.md), [task.md](../../task.md) and the files in [docs/](..). Kept as-is for context.
+
 Absolutely. If we're turning this into the **actual project definition**, I'd make it broad enough to capture the full vision but disciplined enough that it doesn't accidentally become "let's rebuild Bash from scratch." 😂
 
 # Project Description — Modern Human-Readable Shell

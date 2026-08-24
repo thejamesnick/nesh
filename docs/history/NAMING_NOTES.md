@@ -1,3 +1,7 @@
+# Archived
+
+> Historical note from before the project docs existed (2026-08-23). Superseded by [goal.md](../../goal.md), [task.md](../../task.md) and the files in [docs/](..). Kept as-is for context.
+
 😂 **Nesh / `nsh` is actually pretty damn good.**
 
 It has the right relationship to `sh` without sounding like you're literally cloning it.

@@ -1,3 +1,7 @@
+# Archived
+
+> Historical note from before the project docs existed (2026-08-23). Superseded by [goal.md](../../goal.md), [task.md](../../task.md) and the files in [docs/](..). Kept as-is for context.
+
 Hahaha 😂 let's pretend **Nesh is finished** and we're actually sitting in your terminal.
 
 The goal is that it should feel familiar enough that someone coming from Bash can start immediately, but **much easier to read**.

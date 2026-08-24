@@ -1,1 +1,0 @@
-A modern Human readable shell for automation and Scripting
